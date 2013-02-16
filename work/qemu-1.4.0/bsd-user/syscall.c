@@ -278,7 +278,6 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 #ifdef TARGET_ARM
 static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 {
-   abi_ulong val;
 
     switch (op) {
     case TARGET_FREEBSD_ARM_SET_TP:
