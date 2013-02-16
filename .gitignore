@@ -3,3 +3,6 @@
 work/.configure_done.qemu._usr_local
 work/qemu-1.4.0/roms/seabios/config.mak
 work/qemu-1.4.0/roms/vgabios/config.mak
+work/qemu-1.4.0/pc-bios/optionrom/kvmvapic.asm
+work/qemu-1.4.0/pc-bios/optionrom/linuxboot.asm
+work/qemu-1.4.0/pc-bios/optionrom/multiboot.asm
