@@ -1907,7 +1907,7 @@ int main(int argc, char **argv)
 		env->hflags |= MIPS_HFLAG_M16;
 	}
 #if defined(TARGET_MIPS64)
-	env->hflags |= MIPS_HFLAG_UX;
+	env->hflags |= MIPS_HFLAG_UX | MIPS_HFLAG_64;
 #endif
     }
 #else
