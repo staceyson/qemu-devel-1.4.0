@@ -715,9 +715,13 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
     /* Create enough stack to hold everything.  If we don't use
      * it for args, we'll use it for something else...
      */
+#ifdef TARGET_STACK_SIZE
+    size = TARGET_STACK_SIZE;
+#else
     size = x86_stack_size;
     if (size < MAX_ARG_PAGES*TARGET_PAGE_SIZE)
         size = MAX_ARG_PAGES*TARGET_PAGE_SIZE;
+#endif
 
 #ifdef TARGET_USRSTACK
     stack_base = TARGET_USRSTACK - size;
@@ -738,7 +742,7 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
 
 #if defined(__FreeBSD__)
     /*
-     * The inital FreeBSD stack looks like follows:
+     * The inital FreeBSD stack is as follows:
      * (see kern/kern_exec.c exec_copyout_strings() )
      *
      *  Hi Address -> char **ps_argvstr  (struct ps_strings for ps, w, etc.)

@@ -409,19 +409,44 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
     for (p = hnamep, q = snamep, i = 0; i < namelen; p++, i++)
        *q++ = tswap32(*p);
     oidfmt(snamep, namelen, NULL, &kind);
-    /* XXX swap hnewp */
-#if HOST_LONG_BITS == 64 && TARGET_ABI_BITS == 32
-    /* XXX there may be more sysctls that differ */
-    if (namelen == 2 &&
-        snamep[0] == CTL_KERN && snamep[1] == KERN_USRSTACK &&
-        holdlen && holdlen == 4 && hnewp == NULL) {
-       (*(uint32_t *)holdp) = 0xfffff000U;
-       ret = 0;
-    } else
+
+    /* Handle some arch/emulator dependent sysctl()'s here. */
+    if (CTL_KERN == snamep[0]) {
+	    switch(snamep[1]) {
+	    case KERN_USRSTACK:
+#if defined(TARGET_ARM) && HOST_LONG_BITS == 64 && TARGET_ABI_BITS == 32
+		    (*(uint32_t *)holdp) = 0xfffff000U;
+		    holdlen = sizeof(uint32_t);
+		    ret = 0;
+#elif TARGET_USRSTACK != 0
+		    (*(abi_ulong *)holdp) = tswapal(TARGET_USRSTACK);
+		    holdlen = sizeof(abi_ulong);
+		    ret = 0;
+#else
+		    ret = -TARGET_ENOENT;
 #endif
+		    goto out;
+
+	    case KERN_PS_STRINGS:
+#if defined(TARGET_PS_STRINGS)
+		    (*(abi_ulong *)holdp) = tswapal(TARGET_PS_STRINGS);
+		    holdlen = sizeof(abi_ulong);
+		    ret = 0;
+#else
+		    ret = -TARGET_ENOENT;
+#endif
+		    goto out;
+
+	    default:
+		    break;
+	    }
+    }
+
     ret = get_errno(sysctl(snamep, namelen, holdp, &holdlen, hnewp, newlen));
     if (!ret)
         sysctl_oldcvt(holdp, holdlen, kind);
+
+out:
     put_user_ual(holdlen, oldlenp);
     unlock_user(hnamep, namep, 0);
     unlock_user(holdp, oldp, holdlen);
@@ -4617,12 +4642,17 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 		struct target_rlimit *target_rlim;
 		struct rlimit rlim;
 
-		if (!lock_user_struct(VERIFY_READ, target_rlim, arg2, 1))
-			goto efault;
-		rlim.rlim_cur = target_to_host_rlim(target_rlim->rlim_cur);
-		rlim.rlim_max = target_to_host_rlim(target_rlim->rlim_max);
-		unlock_user_struct(target_rlim, arg2, 0);
-		ret = get_errno(setrlimit(resource, &rlim));
+		if (RLIMIT_STACK == resource) {
+			/* XXX We should, maybe, allow the stack size to shrink */
+			ret = -TARGET_EPERM;
+		} else {
+			if (!lock_user_struct(VERIFY_READ, target_rlim, arg2, 1))
+				goto efault;
+			rlim.rlim_cur = target_to_host_rlim(target_rlim->rlim_cur);
+			rlim.rlim_max = target_to_host_rlim(target_rlim->rlim_max);
+			unlock_user_struct(target_rlim, arg2, 0);
+			ret = get_errno(setrlimit(resource, &rlim));
+		}
 	}
 	break;
 
@@ -4633,7 +4663,12 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 		struct target_rlimit *target_rlim;
 		struct rlimit rlim;
 
-		ret = get_errno(getrlimit(resource, &rlim));
+		/* Return the target stack size */
+		if (RLIMIT_STACK == resource) {
+			rlim.rlim_cur = rlim.rlim_max = TARGET_STACK_SIZE;
+			ret = 0;
+		} else
+			ret = get_errno(getrlimit(resource, &rlim));
 		if (!is_error(ret)) {
 			if (!lock_user_struct(VERIFY_WRITE, target_rlim, arg2,
 				0))

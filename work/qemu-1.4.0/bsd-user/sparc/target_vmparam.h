@@ -1,8 +1,6 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
-#define	TARGET_USRSTACK 0
-
 #ifdef __FreeBSD__
 struct target_ps_strings {
         abi_ulong ps_argvstr;
@@ -14,9 +12,22 @@ struct target_ps_strings {
 #define TARGET_SPACE_USRSPACE   4096
 #define TARGET_ARG_MAX          262144
 
+/* XXX  */
+#define TARGET_VM_MAXUSER_ADDRESS	(0xc0000000 - (512 * 1024 * 1024))
+#define TARGET_USRSTACK			TARGET_VM_MAXUSER_ADDRESS
+
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
 #define TARGET_SZSIGCODE 0
+
+/* Make stack size large enough to hold everything. */
+#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
+    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
+
+#else
+
+#define	TARGET_USRSTACK 0
+
 #endif /* __FreeBSD__ */
 
 #endif /* _TARGET_VMPARAM_H_ */

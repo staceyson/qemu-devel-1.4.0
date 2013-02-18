@@ -855,7 +855,9 @@ void cpu_loop(CPUARMState *env)
                 goto do_segv;
             }
             break;
+#if 0
         error:
+#endif
         default:
             fprintf(stderr, "qemu: unhandled CPU exception 0x%x - aborting\n",
                     trapnr);
