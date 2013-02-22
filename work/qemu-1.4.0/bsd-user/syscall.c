@@ -3318,6 +3318,47 @@ host_to_target_fhandle(abi_ulong target_addr, fhandle_t *host_fh)
 }
 
 static inline abi_long
+target_to_host_rtprio(struct rtprio *host_rtp, abi_ulong target_addr)
+{
+	struct target_rtprio *target_rtp;
+
+	if (!lock_user_struct(VERIFY_READ, target_rtp, target_addr, 1))
+		return (-TARGET_EFAULT);
+	__get_user(host_rtp->type, &target_rtp->type);
+	__get_user(host_rtp->prio, &target_rtp->prio);
+	unlock_user_struct(target_rtp, target_addr, 0);
+	return (0);
+}
+
+static inline abi_long
+host_to_target_rtprio(abi_ulong target_addr, struct rtprio *host_rtp)
+{
+	struct target_rtprio *target_rtp;
+
+	if (!lock_user_struct(VERIFY_WRITE, target_rtp, target_addr, 0))
+		return (-TARGET_EFAULT);
+	__put_user(host_rtp->type, &target_rtp->type);
+	__put_user(host_rtp->prio, &target_rtp->prio);
+	unlock_user_struct(target_rtp, target_addr, 1);
+	return (0);
+}
+
+static inline abi_long
+do_rtprio_thread(int function, lwpid_t lwpid, abi_ulong target_addr)
+{
+	int ret;
+	struct rtprio rtp;
+
+	ret = target_to_host_rtprio(&rtp, target_addr);
+	if (0 == ret)
+		ret = get_errno(rtprio_thread(function, lwpid, &rtp));
+	if (0 == ret)
+		ret = host_to_target_rtprio(target_addr, &rtp);
+
+	return (ret);
+}
+
+static inline abi_long
 target_to_host_sched_param(struct sched_param *host_sp, abi_ulong target_addr)
 {
 	struct target_sched_param *target_sp;
@@ -6183,7 +6224,7 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 	 break;
 
     case TARGET_FREEBSD_NR_rtprio_thread:
-	 ret = 0;
+	 ret = do_rtprio_thread(arg1, arg2, arg3);
 	 break;
 
     case TARGET_FREEBSD_NR_getcontext:
