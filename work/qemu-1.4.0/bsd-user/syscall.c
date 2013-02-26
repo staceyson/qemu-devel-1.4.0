@@ -2,7 +2,7 @@
  *  BSD syscalls
  *
  *  Copyright (c) 2003 - 2008 Fabrice Bellard
- *  Copyright (c) 2012 Stacey Son <sson@FreeBSD.org>
+ *  Copyright (c) 2012 - 2013 Stacey Son <sson@FreeBSD.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -407,7 +407,7 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
                           abi_ulong oldlenp, abi_ulong newp, abi_ulong newlen)
 {
     abi_long ret;
-    void *hnamep, *holdp, *hnewp = NULL;
+    void *hnamep, *holdp = NULL, *hnewp = NULL;
     size_t holdlen;
     abi_ulong oldlen = 0;
     int32_t *snamep = g_malloc(sizeof(int32_t) * namelen), *p, *q, i;
@@ -419,7 +419,7 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
         return -TARGET_EFAULT;
     if (newp && !(hnewp = lock_user(VERIFY_READ, newp, newlen, 1)))
         return -TARGET_EFAULT;
-    if (!(holdp = lock_user(VERIFY_WRITE, oldp, oldlen, 0)))
+    if (oldp && !(holdp = lock_user(VERIFY_WRITE, oldp, oldlen, 0)))
         return -TARGET_EFAULT;
     holdlen = oldlen;
     for (p = hnamep, q = snamep, i = 0; i < namelen; p++, i++)
@@ -472,6 +472,12 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 		sysctl_oldcvt(holdp, holdlen, kind);
 	}
     }
+#ifdef DEBUG
+    else {
+	    printf("sysctl(mib[0]=%d, mib[1]=%d, mib[3]=%d...) returned %d\n",
+		snamep[0], snamep[1], snamep[2], (int)ret);
+    }
+#endif
 
 out:
     put_user_ual(holdlen, oldlenp);
