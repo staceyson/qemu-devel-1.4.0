@@ -5397,13 +5397,16 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 				 if (reclen > len)
 					 break;
 				 de->d_reclen = tswap16(reclen);
+				 de->d_fileno = tswap32(de->d_fileno);
 				 len -= reclen;
+				 de = (struct dirent *)((void *)de + reclen);
 			 }
 		 }
 		 unlock_user(dirp, arg2, ret);
-		 if (arg4)
-			 if (put_user(nbytes, arg4, abi_ulong))
+		 if (arg4) {
+			 if (put_user(basep, arg4, abi_ulong))
 				 ret = -TARGET_EFAULT;
+		 }
 	 }
 	 break;
 
