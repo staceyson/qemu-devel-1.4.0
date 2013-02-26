@@ -77,7 +77,7 @@ static uint8_t host_to_target_signal_table[_NSIG] = {
 	[SIGUSR1]	=	TARGET_SIGUSR1,
 	[SIGUSR2]	=	TARGET_SIGUSR2,
 #ifdef SIGTHR
-	[SIGTHR]	=	TARGET_SIGTHR,
+	[SIGTHR + 3]	=	TARGET_SIGTHR,
 #endif
 	/* [SIGLWP]	=	TARGET_SIGLWP, */
 #ifdef SIGLIBRT
