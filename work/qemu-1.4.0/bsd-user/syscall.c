@@ -4020,10 +4020,10 @@ static IOCTLEntry ioctl_entries[] = {
 	{ TARGET_ ## cmd, cmd, #cmd, access, 0, { __VA_ARGS__ } },
 #define	IOCTL_SPECIAL(cmd, access, dofn, ...) \
 	{ TARGET_ ## cmd, cmd, #cmd, access, dofn, { __VA_ARGS__ } },
-#ifdef __FreeBSD__
-#include "freebsd/ioctl.h"
+#if defined(__FreeBSD__)
+#include "freebsd/ioctls.h"
 #else
-#warning No ioctl.h
+#warning No *bsd/ioctls.h
 #endif
 	{ 0, 0 },
 };
@@ -6983,7 +6983,7 @@ void syscall_init(void)
 
 #define STRUCT(name, ...) thunk_register_struct(STRUCT_ ## name, #name, struct_ ## name ## _def);
 #define STRUCT_SPECIAL(name) thunk_register_struct_direct(STRUCT_ ## name, #name, &struct_ ## name ## _def);
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)
 #include "freebsd/syscall_types.h"
 #else
 #warning No syscall_types.h
