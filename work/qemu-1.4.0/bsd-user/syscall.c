@@ -293,12 +293,16 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 {
 	int ret = 0;
+	abi_ulong tmp;
 	CPUMIPSState *mips_env = (CPUMIPSState *)env;
 
 	switch(op) {
 	case TARGET_MIPS_SET_TLS:
-		if (get_user(mips_env->tls_value, parms, abi_ulong))
+		if (get_user(tmp, parms, abi_ulong))
 			ret = -TARGET_EFAULT;
+		/* XXX temporary hack to work around FreeBSD 10 problem. */
+		if (0 == mips_env->tls_value && tmp != 1)
+			mips_env->tls_value = tmp;
 		break;
 	case TARGET_MIPS_GET_TLS:
 		if (put_user(mips_env->tls_value, parms, abi_ulong))
@@ -386,6 +390,18 @@ static int sysctl_oldcvt(void *holdp, size_t holdlen, uint32_t kind)
     return 0;
 }
 
+/*
+ * Convert the undocmented name2oid sysctl data for the target.
+ */
+static inline void
+sysctl_name2oid(uint32_t *holdp, size_t holdlen)
+{
+	size_t i;
+
+	for(i = 0; i < holdlen; i++)
+		holdp[i] = tswap32(holdp[i]);
+}
+
 /* XXX this needs to be emulated on non-FreeBSD hosts... */
 static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong oldp,
                           abi_ulong oldlenp, abi_ulong newp, abi_ulong newlen)
@@ -411,7 +427,8 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
     oidfmt(snamep, namelen, NULL, &kind);
 
     /* Handle some arch/emulator dependent sysctl()'s here. */
-    if (CTL_KERN == snamep[0]) {
+    switch(snamep[0]) {
+    case CTL_KERN:
 	    switch(snamep[1]) {
 	    case KERN_USRSTACK:
 #if defined(TARGET_ARM) && HOST_LONG_BITS == 64 && TARGET_ABI_BITS == 32
@@ -440,11 +457,21 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 	    default:
 		    break;
 	    }
+            break;
+
+    default:
+	    break;
     }
 
     ret = get_errno(sysctl(snamep, namelen, holdp, &holdlen, hnewp, newlen));
-    if (!ret)
-        sysctl_oldcvt(holdp, holdlen, kind);
+    if (!ret) {
+	if (0 == snamep[0] && 3 == snamep[1]) {
+		/* Handle the undocumented name2oid special case. */
+		sysctl_name2oid(holdp, holdlen);
+	} else {
+		sysctl_oldcvt(holdp, holdlen, kind);
+	}
+    }
 
 out:
     put_user_ual(holdlen, oldlenp);
