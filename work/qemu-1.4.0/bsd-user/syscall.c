@@ -70,6 +70,9 @@
 #include <sys/ttycom.h>
 #include <sys/reboot.h>
 #include <sys/timex.h>
+#define _ACL_PRIVATE
+#include <sys/acl.h>
+#include <sys/extattr.h>
 #include <kenv.h>
 #include <pthread.h>
 #include <machine/atomic.h>
@@ -3416,6 +3419,64 @@ host_to_target_sched_param(abi_ulong target_addr, struct sched_param *host_sp)
 }
 
 static inline abi_long
+target_to_host_acl(struct acl *host_acl, abi_ulong target_addr)
+{
+	uint32_t i;
+	struct target_acl *target_acl;
+
+	if (!lock_user_struct(VERIFY_READ, target_acl, target_addr, 1))
+		return (-TARGET_EFAULT);
+
+	__get_user(host_acl->acl_maxcnt, &target_acl->acl_maxcnt);
+	__get_user(host_acl->acl_cnt, &target_acl->acl_cnt);
+
+	for(i = 0; i < host_acl->acl_maxcnt; i++) {
+		__get_user(host_acl->acl_entry[i].ae_tag,
+		    &target_acl->acl_entry[i].ae_tag);
+		__get_user(host_acl->acl_entry[i].ae_id,
+		    &target_acl->acl_entry[i].ae_id);
+		__get_user(host_acl->acl_entry[i].ae_perm,
+		    &target_acl->acl_entry[i].ae_perm);
+		__get_user(host_acl->acl_entry[i].ae_entry_type,
+		    &target_acl->acl_entry[i].ae_entry_type);
+		__get_user(host_acl->acl_entry[i].ae_flags,
+		    &target_acl->acl_entry[i].ae_flags);
+	}
+
+	unlock_user_struct(target_acl, target_addr, 0);
+	return (0);
+}
+
+static inline abi_long
+host_to_target_acl(abi_ulong target_addr, struct acl *host_acl)
+{
+	uint32_t i;
+	struct target_acl *target_acl;
+
+	if (!lock_user_struct(VERIFY_WRITE, target_acl, target_addr, 0))
+		return (-TARGET_EFAULT);
+
+	__put_user(host_acl->acl_maxcnt, &target_acl->acl_maxcnt);
+	__put_user(host_acl->acl_cnt, &target_acl->acl_cnt);
+
+	for(i = 0; i < host_acl->acl_maxcnt; i++) {
+		__put_user(host_acl->acl_entry[i].ae_tag,
+		    &target_acl->acl_entry[i].ae_tag);
+		__put_user(host_acl->acl_entry[i].ae_id,
+		    &target_acl->acl_entry[i].ae_id);
+		__put_user(host_acl->acl_entry[i].ae_perm,
+		    &target_acl->acl_entry[i].ae_perm);
+		__get_user(host_acl->acl_entry[i].ae_entry_type,
+		    &target_acl->acl_entry[i].ae_entry_type);
+		__get_user(host_acl->acl_entry[i].ae_flags,
+		    &target_acl->acl_entry[i].ae_flags);
+	}
+
+	unlock_user_struct(target_acl, target_addr, 1);
+	return (0);
+}
+
+static inline abi_long
 do_sched_setparam(pid_t pid, abi_ulong target_sp_addr)
 {
 	int ret;
@@ -5467,32 +5528,406 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 	 break;
 
 
-    case TARGET_FREEBSD_NR___acl_get_file:
-    case TARGET_FREEBSD_NR___acl_set_file:
-    case TARGET_FREEBSD_NR___acl_get_fd:
-    case TARGET_FREEBSD_NR___acl_set_fd:
-    case TARGET_FREEBSD_NR___acl_delete_file:
-    case TARGET_FREEBSD_NR___acl_delete_fd:
-    case TARGET_FREEBSD_NR___acl_aclcheck_file:
     case TARGET_FREEBSD_NR___acl_aclcheck_fd:
-    case TARGET_FREEBSD_NR___acl_get_link:
-    case TARGET_FREEBSD_NR___acl_set_link:
-    case TARGET_FREEBSD_NR___acl_delete_link:
+	 {
+		 struct acl host_acl;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			 ret = get_errno(__acl_aclcheck_fd(arg1, arg2,
+				 &host_acl));
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_aclcheck_file:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			 ret = get_errno(__acl_aclcheck_file(path(p) , arg2,
+				 &host_acl));
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR___acl_aclcheck_link:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			 ret = get_errno(__acl_aclcheck_link(path(p), arg2,
+				 &host_acl));
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_delete_fd:
+	 ret = get_errno(__acl_delete_fd(arg1, arg2));
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_delete_file:
+	 if (!(p = lock_user_string(arg1)))
+		 goto efault;
+
+	 ret = get_errno(__acl_delete_file(path(p), arg2));
+
+	 unlock_user(p, arg1, 0);
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_delete_link:
+	 if (!(p = lock_user_string(arg1)))
+		 goto efault;
+
+	 ret = get_errno(__acl_delete_link(path(p), arg2));
+
+	 unlock_user(p, arg1, 0);
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_get_fd:
+	 {
+		 struct acl host_acl;
+
+		 ret = get_errno(__acl_get_fd(arg1, arg2, &host_acl));
+
+		 if (!is_error(ret))
+			ret = host_to_target_acl(arg3, &host_acl);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_get_file:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = get_errno(__acl_get_file(path(p), arg2, &host_acl));
+
+		 if (!is_error(ret))
+			 ret = host_to_target_acl(arg3, &host_acl);
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_get_link:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = get_errno(__acl_get_link(path(p), arg2, &host_acl));
+
+		 if (!is_error(ret))
+			 ret = host_to_target_acl(arg3, &host_acl);
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_set_fd:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			ret = get_errno(__acl_set_fd(arg1, arg2, &host_acl));
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_set_file:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			ret = get_errno(__acl_set_file(path(p), arg2,
+				&host_acl));
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
+    case TARGET_FREEBSD_NR___acl_set_link:
+	 {
+		 struct acl host_acl;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 ret = target_to_host_acl(&host_acl, arg3);
+		 if (!is_error(ret))
+			ret = get_errno(__acl_set_link(path(p), arg2,
+				&host_acl));
+
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattrctl:
+	 {
+		 void *a, *f;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(f = lock_user_string(arg3)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg5)))
+			 goto efault;
+
+		 ret = get_errno(extattrctl(path(p), arg2, f, arg4, a));
+
+		 unlock_user(a, arg5, 0);
+		 unlock_user(f, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_set_file:
+	 {
+		 void *a, *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+		 if (!(d = lock_user(VERIFY_READ, arg4, arg5, 1)))
+			 goto efault;
+
+		 ret = get_errno(extattr_set_file(path(p), arg2, a, d, arg5));
+
+		 unlock_user(d, arg4, arg5);
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_get_file:
+	 {
+		 void *a, *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 if (arg4 && arg5 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg4, arg5, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_get_file(path(p), arg2, a, d,
+				 arg5));
+			 unlock_user(d, arg4, arg5);
+		 } else {
+			 ret = get_errno(extattr_get_file(path(p), arg2, a,
+				 NULL, arg5));
+		 }
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_delete_file:
+	 {
+		 void *a;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 ret = get_errno(extattr_delete_file(path(p), arg2, a));
+
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_set_fd:
+	 {
+		 void *a, *d;
+
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+		 if (!(d = lock_user(VERIFY_READ, arg4, arg5, 1)))
+			 goto efault;
+
+		 ret = get_errno(extattr_set_fd(arg1, arg2, a, d, arg5));
+
+		 unlock_user(d, arg4, arg5);
+		 unlock_user(a, arg3, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_get_fd:
+	 {
+		 void *a, *d;
+
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 if (arg4 && arg5 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg4, arg5, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_get_fd(arg1, arg2, a, d,
+				 arg5));
+			 unlock_user(d, arg4, arg5);
+		 } else {
+			 ret = get_errno(extattr_get_fd(arg1, arg2, a,
+				 NULL, arg5));
+		 }
+		 unlock_user(a, arg3, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_delete_fd:
+	 {
+		 void *a;
+
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 ret = get_errno(extattr_delete_fd(arg1, arg2, a));
+
+		 unlock_user(a, arg3, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_get_link:
+	 {
+		 void *a, *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 if (arg4 && arg5 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg4, arg5, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_get_link(path(p), arg2, a, d,
+				 arg5));
+			 unlock_user(d, arg4, arg5);
+		 } else {
+			 ret = get_errno(extattr_get_link(path(p), arg2, a,
+				 NULL, arg5));
+		 }
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_set_link:
+	 {
+		 void *a, *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+		 if (!(d = lock_user(VERIFY_READ, arg4, arg5, 1)))
+			 goto efault;
+
+		 ret = get_errno(extattr_set_link(path(p), arg2, a, d, arg5));
+
+		 unlock_user(d, arg4, arg5);
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_delete_link:
+	 {
+		 void *a;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+		 if (!(a = lock_user_string(arg3)))
+			 goto efault;
+
+		 ret = get_errno(extattr_delete_link(path(p), arg2, a));
+
+		 unlock_user(a, arg3, 0);
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_list_fd:
+	 {
+		 void *d;
+
+		 if (arg3 && arg4 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg3, arg4, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_list_fd(arg1, arg2, d,
+				 arg4));
+			 unlock_user(d, arg3, arg4);
+		 } else {
+			 ret = get_errno(extattr_list_fd(arg1, arg2,
+				 NULL, arg4));
+		 }
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_list_file:
+	 {
+		 void *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 if (arg3 && arg4 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg3, arg4, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_list_file(path(p), arg2, d,
+				 arg4));
+			 unlock_user(d, arg3, arg4);
+		 } else {
+			 ret = get_errno(extattr_list_file(path(p), arg2,
+				 NULL, arg4));
+		 }
+		 unlock_user(p, arg1, 0);
+	 }
+	 break;
+
     case TARGET_FREEBSD_NR_extattr_list_link:
-	 ret = unimplemented(num);
+	 {
+		 void *d;
+
+		 if (!(p = lock_user_string(arg1)))
+			 goto efault;
+
+		 if (arg3 && arg4 > 0) {
+			 if (!(d = lock_user(VERIFY_WRITE, arg3, arg4, 0)))
+				 goto efault;
+			 ret = get_errno(extattr_list_link(path(p), arg2, d,
+				 arg4));
+			 unlock_user(d, arg3, arg4);
+		 } else {
+			 ret = get_errno(extattr_list_link(path(p), arg2,
+				 NULL, arg4));
+		 }
+
+		 unlock_user(p, arg1, 0);
+	 }
 	 break;
 
     case TARGET_FREEBSD_NR_setlogin:

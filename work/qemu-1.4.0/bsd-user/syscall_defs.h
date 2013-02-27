@@ -756,3 +756,26 @@ struct target_timex {
 struct target_sched_param {
 	int32_t	sched_priority;
 };
+
+
+/*
+ * sys/acl.h
+ */
+
+#define	TARGET_ACL_MAX_ENTRIES	254
+
+struct target_acl_entry {
+	int32_t		ae_tag;
+	uint32_t	ae_id;
+	uint16_t	ae_perm;
+	uint16_t	ae_entry_type;
+	uint16_t	ae_flags;
+};
+
+struct target_acl {
+	uint32_t			acl_maxcnt;
+	uint32_t			acl_cnt;
+	int32_t				acl_space[4];
+	struct target_acl_entry		acl_entry[TARGET_ACL_MAX_ENTRIES];
+};
+
