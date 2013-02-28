@@ -68,6 +68,7 @@
 #include <sys/termios.h>
 #endif
 #include <sys/ttycom.h>
+#include <sys/filio.h>
 #include <sys/reboot.h>
 #include <sys/timex.h>
 #define _ACL_PRIVATE
@@ -90,6 +91,7 @@
 #include "qemu-common.h"
 #ifdef __FreeBSD__
 #include "freebsd/ttycom.h"
+#include "freebsd/filio.h"
 #endif
 
 
