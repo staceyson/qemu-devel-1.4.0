@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/ioccom.h>
+#include <ctype.h>
 #include "qemu.h"
 
 int do_strace=0;
@@ -52,6 +54,54 @@ print_execve(const struct syscallname *name,
     }
 
     gemu_log("NULL})");
+}
+
+static void
+print_ioctl(const struct syscallname *name,
+             abi_long arg1, abi_long arg2, abi_long arg3,
+             abi_long arg4, abi_long arg5, abi_long arg6)
+{
+	/* Decode the ioctl request */
+	gemu_log("%s(%d, 0x%0lx { IO%s%s GRP:0x%x('%c') CMD:%d LEN:%d }, 0x"
+	    TARGET_ABI_FMT_lx ", ...)",
+
+	    name->name,
+	    (int)arg1,
+	    (unsigned long)arg2,
+	    arg2 & IOC_OUT ? "R" : "",
+	    arg2 & IOC_IN ? "W" : "",
+	    (unsigned)IOCGROUP(arg2),
+	    isprint(IOCGROUP(arg2)) ? (char)IOCGROUP(arg2) : '?',
+	    (int)arg2 & 0xFF,
+	    (int)IOCPARM_LEN(arg2),
+	    arg3);
+}
+
+static void
+print_sysarch(const struct syscallname *name,
+             abi_long arg1, abi_long arg2, abi_long arg3,
+             abi_long arg4, abi_long arg5, abi_long arg6)
+{
+#ifdef TARGET_MIPS
+	switch(arg1) {
+	case 1:
+		gemu_log("%s(SET_TLS, 0x" TARGET_ABI_FMT_lx ")",
+		    name->name, arg2);
+		break;
+
+	case 2:
+		gemu_log("%s(GET_TLS, 0x" TARGET_ABI_FMT_lx ")",
+		    name->name, arg2);
+		break;
+
+	default:
+		gemu_log("UNKNOWN OP: %d, " TARGET_ABI_FMT_lx ")",
+		    (int)arg1, arg2);
+	}
+#else
+	gemu_log("%s(%d, " TARGET_ABI_FMT_lx ", " TARGET_ABI_FMT_lx ", "
+	    TARGET_ABI_FMT_lx ")", name->name, (int)arg1, arg2, arg3, arg4);
+#endif
 }
 
 /*
