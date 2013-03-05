@@ -53,6 +53,7 @@
 { TARGET_FREEBSD_NR_fchmod, "fchmod", "%s(%d,%#o)", NULL, NULL },
 { TARGET_FREEBSD_NR_fchown, "fchown", "%s(\"%s\",%d,%d)", NULL, NULL },
 { TARGET_FREEBSD_NR_fcntl, "fcntl", NULL, NULL, NULL },
+{ TARGET_FREEBSD_NR_fexecve, "fexecve", NULL, print_execve, NULL },
 { TARGET_FREEBSD_NR_fhopen, "fhopen", NULL, NULL, NULL },
 { TARGET_FREEBSD_NR_fhstat, "fhstat", NULL, NULL, NULL },
 { TARGET_FREEBSD_NR_fhstatfs, "fhstatfs", NULL, NULL, NULL },

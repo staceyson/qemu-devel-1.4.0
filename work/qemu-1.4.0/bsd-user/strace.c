@@ -7,6 +7,9 @@
 #include <sys/ioccom.h>
 #include <ctype.h>
 #include "qemu.h"
+#ifdef __FreeBSD__
+#include "freebsd/syscall_nr.h"
+#endif
 
 int do_strace=0;
 
@@ -32,10 +35,18 @@ print_execve(const struct syscallname *name,
     abi_ulong arg_ptr_addr;
     char *s;
 
-    if (!(s = lock_user_string(arg1)))
-        return;
-    gemu_log("%s(\"%s\",{", name->name, s);
-    unlock_user(s, arg1, 0);
+#ifdef __FreeBSD__
+    if (TARGET_FREEBSD_NR_fexecve == name->nr) {
+	    gemu_log("%s(%d,{", name->name, (int)arg1);
+
+    } else
+#endif
+    {
+	    if (!(s = lock_user_string(arg1)))
+		    return;
+	    gemu_log("%s(\"%s\",{", name->name, s);
+	    unlock_user(s, arg1, 0);
+    }
 
     for (arg_ptr_addr = arg2; ; arg_ptr_addr += sizeof(abi_ulong)) {
         abi_ulong *arg_ptr, arg_addr;

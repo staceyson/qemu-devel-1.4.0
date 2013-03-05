@@ -4192,6 +4192,111 @@ do_ioctl(int fd, abi_long cmd, abi_long arg)
 	return (ret);
 }
 
+static inline abi_long
+freebsd_exec_common(abi_ulong path_or_fd, abi_ulong guest_argp,
+    abi_ulong guest_envp, int do_fexec)
+{
+	char **argp, **envp;
+	int argc, envc;
+	abi_ulong gp;
+	abi_ulong addr;
+	char **q;
+	int total_size = 0;
+	void *p;
+	abi_long ret;
+
+	argc = 0;
+	for (gp = guest_argp; gp; gp += sizeof(abi_ulong)) {
+		if (get_user_ual(addr, gp))
+			goto execve_efault;
+		if (!addr)
+			break;
+		argc++;
+	}
+	envc = 0;
+	for (gp = guest_envp; gp; gp += sizeof(abi_ulong)) {
+		if (get_user_ual(addr, gp))
+			goto execve_efault;
+		if (!addr)
+			break;
+		envc++;
+	}
+
+	argp = alloca((argc + 1) * sizeof(void *));
+	envp = alloca((envc + 1) * sizeof(void *));
+	for (gp = guest_argp, q = argp; gp; gp += sizeof(abi_ulong), q++) {
+		if (get_user_ual(addr, gp))
+			goto execve_efault;
+		if (!addr)
+			break;
+		if (!(*q = lock_user_string(addr)))
+			goto execve_efault;
+		total_size += strlen(*q) + 1;
+	}
+	*q = NULL;
+
+	for (gp = guest_envp, q = envp; gp; gp += sizeof(abi_ulong), q++) {
+                if (get_user_ual(addr, gp))
+                    goto execve_efault;
+                if (!addr)
+                    break;
+                if (!(*q = lock_user_string(addr)))
+                    goto execve_efault;
+                total_size += strlen(*q) + 1;
+	}
+	*q = NULL;
+
+	/*
+	 * This case will not be caught by the host's execve() if its
+	 * page size is bigger than the target's.
+	 */
+	if (total_size > MAX_ARG_PAGES * TARGET_PAGE_SIZE) {
+		ret = -TARGET_E2BIG;
+		goto execve_end;
+	}
+
+	if (do_fexec) {
+		ret = get_errno(fexecve((int)path_or_fd, argp, envp));
+	} else {
+		if (!(p = lock_user_string(path_or_fd)))
+			goto execve_efault;
+		ret = get_errno(execve(p, argp, envp));
+		unlock_user(p, path_or_fd, 0);
+	}
+	goto execve_end;
+
+execve_end:
+	for (gp = guest_argp, q = argp; *q; gp += sizeof(abi_ulong), q++) {
+		if (get_user_ual(addr, gp) || !addr)
+			break;
+		unlock_user(*q, addr, 0);
+	}
+
+	for (gp = guest_envp, q = envp; *q; gp += sizeof(abi_ulong), q++) {
+		if (get_user_ual(addr, gp) || !addr)
+			break;
+		unlock_user(*q, addr, 0);
+	}
+	return (ret);
+
+execve_efault:
+	return (-TARGET_EFAULT);
+}
+
+static inline abi_long
+do_freebsd_execve(abi_ulong path_or_fd, abi_ulong argp, abi_ulong envp)
+{
+
+	return (freebsd_exec_common(path_or_fd, argp, envp, 0));
+}
+
+static inline abi_long
+do_freebsd_fexecve(abi_ulong path_or_fd, abi_ulong argp, abi_ulong envp)
+{
+
+	return (freebsd_exec_common(path_or_fd, argp, envp, 1));
+}
+
 /* do_syscall() should always have a single exit point at the end so
    that actions, such as logging of syscall results, can be performed.
    All errnos that do_syscall() returns must be -TARGET_<errcode>. */
@@ -4611,95 +4716,13 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 #endif
 
     case TARGET_FREEBSD_NR_execve:
-        {
-            char **argp, **envp;
-            int argc, envc;
-            abi_ulong gp;
-            abi_ulong guest_argp;
-            abi_ulong guest_envp;
-            abi_ulong addr;
-            char **q;
-            int total_size = 0;
-
-            argc = 0;
-            guest_argp = arg2;
-            for (gp = guest_argp; gp; gp += sizeof(abi_ulong)) {
-                if (get_user_ual(addr, gp))
-                    goto efault;
-                if (!addr)
-                    break;
-                argc++;
-            }
-            envc = 0;
-            guest_envp = arg3;
-            for (gp = guest_envp; gp; gp += sizeof(abi_ulong)) {
-                if (get_user_ual(addr, gp))
-                    goto efault;
-                if (!addr)
-                    break;
-                envc++;
-            }
-
-            argp = alloca((argc + 1) * sizeof(void *));
-            envp = alloca((envc + 1) * sizeof(void *));
-
-            for (gp = guest_argp, q = argp; gp;
-                  gp += sizeof(abi_ulong), q++) {
-                if (get_user_ual(addr, gp))
-                    goto execve_efault;
-                if (!addr)
-                    break;
-                if (!(*q = lock_user_string(addr)))
-                    goto execve_efault;
-                total_size += strlen(*q) + 1;
-            }
-            *q = NULL;
-
-            for (gp = guest_envp, q = envp; gp;
-                  gp += sizeof(abi_ulong), q++) {
-                if (get_user_ual(addr, gp))
-                    goto execve_efault;
-                if (!addr)
-                    break;
-                if (!(*q = lock_user_string(addr)))
-                    goto execve_efault;
-                total_size += strlen(*q) + 1;
-            }
-            *q = NULL;
-
-            /* This case will not be caught by the host's execve() if its
-               page size is bigger than the target's. */
-            if (total_size > MAX_ARG_PAGES * TARGET_PAGE_SIZE) {
-                ret = -TARGET_E2BIG;
-                goto execve_end;
-            }
-            if (!(p = lock_user_string(arg1)))
-                goto execve_efault;
-            ret = get_errno(execve(p, argp, envp));
-            unlock_user(p, arg1, 0);
-
-            goto execve_end;
-
-        execve_efault:
-            ret = -TARGET_EFAULT;
-
-        execve_end:
-            for (gp = guest_argp, q = argp; *q;
-                  gp += sizeof(abi_ulong), q++) {
-                if (get_user_ual(addr, gp)
-                    || !addr)
-                    break;
-                unlock_user(*q, addr, 0);
-            }
-            for (gp = guest_envp, q = envp; *q;
-                  gp += sizeof(abi_ulong), q++) {
-                if (get_user_ual(addr, gp)
-                    || !addr)
-                    break;
-                unlock_user(*q, addr, 0);
-            }
-        }
+	ret = do_freebsd_execve(arg1, arg2, arg3);
         break;
+
+    case TARGET_FREEBSD_NR_fexecve:
+	ret = do_freebsd_fexecve(arg1, arg2, arg3);
+        break;
+
 
     case TARGET_FREEBSD_NR_pipe:
 	{
