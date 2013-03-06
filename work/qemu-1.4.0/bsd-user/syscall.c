@@ -100,6 +100,70 @@
 static abi_ulong target_brk;
 static abi_ulong target_original_brk;
 
+static char *get_filename_from_fd(pid_t pid, int fd, char *filename, size_t len);
+
+#ifdef __FreeBSD__
+#include <sys/queue.h>
+#include <sys/user.h>
+#include <libprocstat.h>
+
+
+/*
+ * Get the filename for the given file descriptor.
+ * Note that this may return NULL (fail) if no longer cached in the kernel.
+ */
+static char *
+get_filename_from_fd(pid_t pid, int fd, char *filename, size_t len)
+{
+	unsigned int cnt;
+	struct procstat *procstat = NULL;
+	struct kinfo_proc *kipp = NULL;
+	struct filestat_list *head = NULL;
+	struct filestat *fst;
+	char *ret = NULL;
+
+	procstat = procstat_open_sysctl();
+	if (NULL == procstat)
+		goto out;
+
+	kipp = procstat_getprocs(procstat, KERN_PROC_PID, pid, &cnt);
+	if (NULL == kipp)
+		goto out;
+
+	head = procstat_getfiles(procstat, kipp, 0);
+	if (NULL == head)
+		goto out;
+
+	STAILQ_FOREACH(fst, head, next) {
+		if (fd == fst->fs_fd) {
+			if (fst->fs_path != NULL) {
+				(void)strlcpy(filename, fst->fs_path, len);
+				ret = filename;
+			}
+			break;
+		}
+	}
+
+out:
+	if (head != NULL)
+		procstat_freefiles(procstat, head);
+	if (kipp != NULL)
+		procstat_freeprocs(procstat, kipp);
+	if (procstat != NULL)
+		procstat_close(procstat);
+	return (ret);
+}
+
+#else
+
+static char *
+get_filename_from_fd(pid_t pid, int fd, char *filename, size_t len)
+{
+	return (NULL);
+}
+
+#endif /* ! __FreeBSD__ */
+
 static inline abi_long get_errno(abi_long ret)
 {
     if (ret == -1)
@@ -4196,7 +4260,7 @@ static inline abi_long
 freebsd_exec_common(abi_ulong path_or_fd, abi_ulong guest_argp,
     abi_ulong guest_envp, int do_fexec)
 {
-	char **argp, **envp;
+	char **argp, **envp, **qargp, **qarg1;
 	int argc, envc;
 	abi_ulong gp;
 	abi_ulong addr;
@@ -4208,7 +4272,7 @@ freebsd_exec_common(abi_ulong path_or_fd, abi_ulong guest_argp,
 	argc = 0;
 	for (gp = guest_argp; gp; gp += sizeof(abi_ulong)) {
 		if (get_user_ual(addr, gp))
-			goto execve_efault;
+			return (-TARGET_EFAULT);
 		if (!addr)
 			break;
 		argc++;
@@ -4216,32 +4280,43 @@ freebsd_exec_common(abi_ulong path_or_fd, abi_ulong guest_argp,
 	envc = 0;
 	for (gp = guest_envp; gp; gp += sizeof(abi_ulong)) {
 		if (get_user_ual(addr, gp))
-			goto execve_efault;
+			return (-TARGET_EFAULT);
 		if (!addr)
 			break;
 		envc++;
 	}
 
-	argp = alloca((argc + 1) * sizeof(void *));
+	qargp = argp =  alloca((argc + 3) * sizeof(void *));
+	/* save the first agrument for the emulator */
+	*argp++ = (char *)getprogname();
+	qarg1 = argp;
 	envp = alloca((envc + 1) * sizeof(void *));
 	for (gp = guest_argp, q = argp; gp; gp += sizeof(abi_ulong), q++) {
-		if (get_user_ual(addr, gp))
-			goto execve_efault;
+		if (get_user_ual(addr, gp)) {
+			ret = -TARGET_EFAULT;
+			goto execve_end;
+		}
 		if (!addr)
 			break;
-		if (!(*q = lock_user_string(addr)))
-			goto execve_efault;
+		if (!(*q = lock_user_string(addr))) {
+			ret = -TARGET_EFAULT;
+			goto execve_end;
+		}
 		total_size += strlen(*q) + 1;
 	}
 	*q = NULL;
 
 	for (gp = guest_envp, q = envp; gp; gp += sizeof(abi_ulong), q++) {
-                if (get_user_ual(addr, gp))
-                    goto execve_efault;
+                if (get_user_ual(addr, gp)) {
+			ret = -TARGET_EFAULT;
+			goto execve_end;
+		}
                 if (!addr)
                     break;
-                if (!(*q = lock_user_string(addr)))
-                    goto execve_efault;
+                if (!(*q = lock_user_string(addr))) {
+			ret = -TARGET_EFAULT;
+			goto execve_end;
+		}
                 total_size += strlen(*q) + 1;
 	}
 	*q = NULL;
@@ -4256,14 +4331,53 @@ freebsd_exec_common(abi_ulong path_or_fd, abi_ulong guest_argp,
 	}
 
 	if (do_fexec) {
-		ret = get_errno(fexecve((int)path_or_fd, argp, envp));
+		if (((int)path_or_fd > 0 &&
+		    is_target_elf_binary((int)path_or_fd)) == 1) {
+			char execpath[PATH_MAX];
+
+			/*
+			 * The executable is an elf binary for the target
+			 * arch.  execve() it using the emulator if we can
+			 * determine the filename path from the fd.
+			 */
+			if (get_filename_from_fd(getpid(), (int)path_or_fd,
+				execpath, sizeof(execpath)) != NULL) {
+				*qarg1 = execpath;
+				ret = get_errno(execve(qemu_proc_pathname,
+					qargp, envp));
+			} else {
+				/* Getting the filename path failed. */
+				ret = -TARGET_EBADF;
+				goto execve_end;
+			}
+		} else {
+			ret = get_errno(fexecve((int)path_or_fd, argp, envp));
+		}
 	} else {
-		if (!(p = lock_user_string(path_or_fd)))
-			goto execve_efault;
-		ret = get_errno(execve(p, argp, envp));
+		int fd;
+
+		if (!(p = lock_user_string(path_or_fd))) {
+			ret = -TARGET_EFAULT;
+			goto execve_end;
+		}
+
+		/*
+		 * Check the header and see if it a target elf binary.  If so
+		 * then execute using qemu user mode emulator.
+		 */
+		fd = open(p, O_RDONLY | O_CLOEXEC);
+		if (fd > 0 && is_target_elf_binary(fd) == 1) {
+			close(fd);
+			/* Execve() as a target binary using emulator. */
+			*qarg1 = (char *)p;
+			ret = get_errno(execve(qemu_proc_pathname, qargp, envp));
+		} else {
+			close(fd);
+			/* Execve() as a host native binary. */
+			ret = get_errno(execve(p, argp, envp));
+		}
 		unlock_user(p, path_or_fd, 0);
 	}
-	goto execve_end;
 
 execve_end:
 	for (gp = guest_argp, q = argp; *q; gp += sizeof(abi_ulong), q++) {
@@ -4278,9 +4392,6 @@ execve_end:
 		unlock_user(*q, addr, 0);
 	}
 	return (ret);
-
-execve_efault:
-	return (-TARGET_EFAULT);
 }
 
 static inline abi_long

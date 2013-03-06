@@ -286,11 +286,11 @@ core_dump_signal(int sig)
 }
 
 /* Signal queue handling. */
-static inline struct sigqueue *
+static inline struct qemu_sigqueue *
 alloc_sigqueue(CPUArchState *env)
 {
 	TaskState *ts = env->opaque;
-	struct sigqueue *q = ts->first_free;
+	struct qemu_sigqueue *q = ts->first_free;
 
 	if (!q)
 		return (NULL);
@@ -299,7 +299,7 @@ alloc_sigqueue(CPUArchState *env)
 }
 
 static inline void
-free_sigqueue(CPUArchState *env, struct sigqueue *q)
+free_sigqueue(CPUArchState *env, struct qemu_sigqueue *q)
 {
 
 	TaskState *ts = env->opaque;
@@ -372,7 +372,7 @@ queue_signal(CPUArchState *env, int sig, target_siginfo_t *info)
 {
 	TaskState *ts = env->opaque;
 	struct emulated_sigtable *k;
-	struct sigqueue *q, **pq;
+	struct qemu_sigqueue *q, **pq;
 	abi_ulong handler;
 	int queue;
 
@@ -1049,7 +1049,7 @@ process_pending_signals(CPUArchState *cpu_env)
 	target_sigset_t target_old_set;
 	struct emulated_sigtable *k;
 	struct target_sigaction *sa;
-	struct sigqueue *q;
+	struct qemu_sigqueue *q;
 	TaskState *ts = cpu_env->opaque;
 
 	if (!ts->signal_pending)

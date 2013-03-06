@@ -2,6 +2,7 @@
  *  qemu user main
  *
  *  Copyright (c) 2003-2008 Fabrice Bellard
+ *  Copyright (c) 2012-2013 Stacey Son
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,6 +26,7 @@
 #include <machine/trap.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/sysctl.h>
 
 #include "qemu.h"
 #include "qemu-common.h"
@@ -57,6 +59,36 @@ enum BSDType bsd_type;
    we allocate a bigger stack. Need a better solution, for example
    by remapping the process stack directly at the right place */
 unsigned long x86_stack_size = 512 * 1024;
+
+static void save_proc_pathname(void);
+char qemu_proc_pathname[PATH_MAX];
+
+#ifdef __FreeBSD__
+static void
+save_proc_pathname(void)
+{
+	int mib[4];
+	size_t len;
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_PROC;
+	mib[2] = KERN_PROC_PATHNAME;
+	mib[3] = -1;
+
+	len = sizeof(qemu_proc_pathname);
+
+	if (sysctl(mib, 4, qemu_proc_pathname, &len, NULL, 0))
+		perror("sysctl");
+}
+
+#else
+
+static void
+save_proc_pathname(void)
+{
+}
+
+#endif /* !__FreeBSD__ */
 
 void gemu_log(const char *fmt, ...)
 {
@@ -1495,6 +1527,8 @@ int main(int argc, char **argv)
 
     if (argc <= 1)
         usage();
+
+    save_proc_pathname();
 
     module_call_init(MODULE_INIT_QOM);
 

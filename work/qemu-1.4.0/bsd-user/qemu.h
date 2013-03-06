@@ -64,15 +64,15 @@ struct image_info {
 
 #define MAX_SIGQUEUE_SIZE 1024
 
-struct sigqueue {
-    struct sigqueue *next;
+struct qemu_sigqueue {
+    struct qemu_sigqueue *next;
     target_siginfo_t info;
 };
 
 struct emulated_sigtable {
     int pending; /* true if signal is pending */
-    struct sigqueue *first;
-    struct sigqueue info; /* in order to always have memory for the
+    struct qemu_sigqueue *first;
+    struct qemu_sigqueue info; /* in order to always have memory for the
                              first signal, we put it here */
 };
 
@@ -95,8 +95,8 @@ typedef struct TaskState {
     struct bsd_binprm *bprm;
 
     struct emulated_sigtable sigtab[TARGET_NSIG];
-    struct sigqueue sigqueue_table[MAX_SIGQUEUE_SIZE]; /* siginfo queue */
-    struct sigqueue *first_free; /* first free siginfo queue entry */
+    struct qemu_sigqueue sigqueue_table[MAX_SIGQUEUE_SIZE]; /* siginfo queue */
+    struct qemu_sigqueue *first_free; /* first free siginfo queue entry */
     int signal_pending; /* non zero if a signal may be pending */
 
     uint8_t stack[0];
@@ -146,6 +146,7 @@ int load_elf_binary(struct bsd_binprm * bprm, struct target_pt_regs * regs,
                     struct image_info * info);
 int load_flt_binary(struct bsd_binprm * bprm, struct target_pt_regs * regs,
                     struct image_info * info);
+int is_target_elf_binary(int fd);
 
 void target_set_brk(abi_ulong new_brk);
 abi_long do_brk(abi_ulong new_brk);
@@ -222,6 +223,7 @@ void mmap_fork_end(int child);
 
 /* main.c */
 extern unsigned long x86_stack_size;
+extern char qemu_proc_pathname[];
 
 /* user access */
 
