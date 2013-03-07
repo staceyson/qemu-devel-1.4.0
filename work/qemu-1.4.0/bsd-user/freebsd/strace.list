@@ -13,7 +13,7 @@
 { TARGET_FREEBSD_NR___getcwd, "__getcwd", NULL, NULL, NULL },
 { TARGET_FREEBSD_NR___semctl, "__semctl", NULL, NULL, NULL },
 { TARGET_FREEBSD_NR___syscall, "__syscall", NULL, NULL, NULL },
-{ TARGET_FREEBSD_NR___sysctl, "__sysctl", NULL, NULL, NULL },
+{ TARGET_FREEBSD_NR___sysctl, "__sysctl", NULL, print_sysctl, NULL },
 { TARGET_FREEBSD_NR__umtx_op, "_umtx_op", "%s(%#x, %d, %d, %#x, %#x)", NULL, NULL },
 { TARGET_FREEBSD_NR_accept, "accept", "%s(%d,%#x,%#x)", NULL, NULL },
 { TARGET_FREEBSD_NR_access, "access", "%s(\"%s\",%#o)", NULL, NULL },
