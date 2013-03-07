@@ -362,17 +362,13 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 {
 	int ret = 0;
-	abi_ulong tmp;
 	CPUMIPSState *mips_env = (CPUMIPSState *)env;
 
 	switch(op) {
 	case TARGET_MIPS_SET_TLS:
-		if (get_user(tmp, parms, abi_ulong))
-			ret = -TARGET_EFAULT;
-		/* XXX temporary hack to work around FreeBSD 10 problem. */
-		if (0 == mips_env->tls_value && tmp != 1)
-			mips_env->tls_value = tmp;
+		mips_env->tls_value = parms;
 		break;
+
 	case TARGET_MIPS_GET_TLS:
 		if (put_user(mips_env->tls_value, parms, abi_ulong))
 			ret = -TARGET_EFAULT;

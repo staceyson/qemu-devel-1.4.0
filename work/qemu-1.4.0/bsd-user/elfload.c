@@ -403,8 +403,11 @@ static inline void init_thread(struct target_pt_regs *regs, struct image_info *i
 {
 
     regs->cp0_status = 2 << CP0St_KSU;
-    regs->regs[25] = regs->cp0_epc = infop->entry;	 /* t9 = pc = entry */
+    regs->regs[25] = regs->cp0_epc = infop->entry & ~3;	 /* t9 = pc = entry */
     regs->regs[4] = regs->regs[29] = infop->start_stack; /* a0 = sp = start_stack */
+    regs->regs[5] = 0;					 /* a1 = 0 */
+    regs->regs[6] = 0;					 /* a2 = 0 */
+    regs->regs[7] = TARGET_PS_STRINGS;			 /* a3 = ps_strings */
 }
 
 #define USE_ELF_CORE_DUMP
@@ -1445,13 +1448,10 @@ int load_elf_binary(struct bsd_binprm * bprm, struct target_pt_regs * regs,
             /* JRP - Need to add X86 lib dir stuff here... */
 
             if (strcmp(elf_interpreter,"/usr/lib/libc.so.1") == 0 ||
-                strcmp(elf_interpreter,"/usr/lib/ld.so.1") == 0) {
+                strcmp(elf_interpreter,"/libexec/ld-elf.so.1") == 0) {
               ibcs2_interpreter = 1;
             }
 
-#if 0
-            printf("Using ELF interpreter %s\n", path(elf_interpreter));
-#endif
             if (retval >= 0) {
                 retval = open(path(elf_interpreter), O_RDONLY);
                 if(retval >= 0) {
