@@ -607,6 +607,24 @@ static abi_long unlock_iovec(struct iovec *vec, abi_ulong target_addr,
 }
 
 static inline abi_long
+target_to_host_ip_mreq(struct ip_mreqn *mreqn, abi_ulong target_addr,
+    socklen_t len)
+{
+	struct target_ip_mreqn *target_smreqn;
+
+	target_smreqn = lock_user(VERIFY_READ, target_addr, len, 1);
+	if (!target_smreqn)
+		return -TARGET_EFAULT;
+	mreqn->imr_multiaddr.s_addr = target_smreqn->imr_multiaddr.s_addr;
+	mreqn->imr_address.s_addr = target_smreqn->imr_address.s_addr;
+	if (len == sizeof(struct target_ip_mreqn))
+		mreqn->imr_ifindex = tswapal(target_smreqn->imr_ifindex);
+	unlock_user(target_smreqn, target_addr, 0);
+
+	return (0);
+}
+
+static inline abi_long
 target_to_host_sockaddr(struct sockaddr *addr, abi_ulong target_addr,
     socklen_t len)
 {
@@ -1652,11 +1670,62 @@ int_case:
 		}
 		break;
 
+	case IPPROTO_TCP:
+		/* TCP options all take an 'int' value. */
+		goto int_case;
+
+	case IPPROTO_IP:
+		switch(optname) {
+		case IP_HDRINCL:
+		case IP_TOS:
+		case IP_TTL:
+		case IP_RECVOPTS:
+		case IP_RECVRETOPTS:
+		case IP_RECVDSTADDR:
+
+		case IP_RETOPTS:
+		case IP_RECVTOS:
+		case IP_MULTICAST_TTL:
+		case IP_MULTICAST_LOOP:
+		case IP_PORTRANGE:
+		case IP_IPSEC_POLICY:
+		case IP_FAITH:
+		case IP_ONESBCAST:
+		case IP_BINDANY:
+			if (get_user_u32(len, optlen))
+				return (-TARGET_EFAULT);
+			if (len < 0)
+				return (-TARGET_EINVAL);
+			lv = sizeof(lv);
+			ret = get_errno(getsockopt(sockfd, level, optname,
+				&val, &lv));
+			if (ret < 0)
+				return (ret);
+			if (len < sizeof(int) && len > 0 && val >= 0 &&
+			    val < 255) {
+				len = 1;
+				if (put_user_u32(len, optlen)
+				    || put_user_u8(val, optval_addr))
+					return (-TARGET_EFAULT);
+			} else {
+				if (len > sizeof(int))
+					len = sizeof(int);
+				if (put_user_u32(len, optlen)
+				    || put_user_u32(val, optval_addr))
+					return (-TARGET_EFAULT);
+			}
+			break;
+
+		default:
+			goto unimplemented;
+		}
+		break;
+
 	default:
 unimplemented:
 		gemu_log("getsockopt level=%d optname=%d not yet supported\n",
 		    level, optname);
-		ret = -TARGET_EOPNOTSUPP;
+		ret = (-TARGET_EOPNOTSUPP);
 		break;
 	}
 	return (ret);
@@ -1667,10 +1736,67 @@ static abi_long
 do_setsockopt(int sockfd, int level, int optname, abi_ulong optval_addr,
     socklen_t optlen)
 {
-	int val;
 	abi_long ret;
+	int val;
+	struct ip_mreqn *ip_mreq;
 
 	switch(level) {
+	case IPPROTO_TCP:
+		/* TCP options all take an 'int' value. */
+		if (optlen < sizeof(uint32_t))
+			return (-TARGET_EINVAL);
+
+		if (get_user_u32(val, optval_addr))
+			return (-TARGET_EFAULT);
+		ret = get_errno(setsockopt(sockfd, level, optname, &val,
+			sizeof(val)));
+		break;
+
+	case IPPROTO_IP:
+		switch (optname) {
+		case IP_HDRINCL:/* int; header is included with data */
+		case IP_TOS:	/* int; IP type of service and preced. */
+		case IP_TTL:	/* int; IP time to live */
+		case IP_RECVOPTS: /* bool; receive all IP opts w/dgram */
+		case IP_RECVRETOPTS: /* bool; receive IP opts for response */
+		case IP_RECVDSTADDR: /* bool; receive IP dst addr w/dgram */
+		case IP_MULTICAST_IF:/* u_char; set/get IP multicast i/f  */
+		case IP_MULTICAST_TTL:/* u_char; set/get IP multicast ttl */
+		case IP_MULTICAST_LOOP:/*u_char;set/get IP multicast loopback */
+		case IP_PORTRANGE: /* int; range to choose for unspec port */
+		case IP_RECVIF: /* bool; receive reception if w/dgram */
+		case IP_IPSEC_POLICY:	/* int; set/get security policy */
+		case IP_FAITH:	/* bool; accept FAITH'ed connections */
+		case IP_RECVTTL: /* bool; receive reception TTL w/dgram */
+			val = 0;
+			if (optlen >= sizeof(uint32_t)) {
+				if (get_user_u32(val, optval_addr))
+					return (-TARGET_EFAULT);
+			} else if (optlen >= 1) {
+				if (get_user_u8(val, optval_addr))
+					return (-TARGET_EFAULT);
+			}
+			ret = get_errno(setsockopt(sockfd, level, optname,
+				&val, sizeof(val)));
+			break;
+
+		case IP_ADD_MEMBERSHIP: /*ip_mreq; add an IP group membership */
+		case IP_DROP_MEMBERSHIP:/*ip_mreq; drop an IP group membership*/
+			if (optlen < sizeof (struct target_ip_mreq) ||
+			    optlen > sizeof (struct target_ip_mreqn))
+				return (-TARGET_EINVAL);
+			ip_mreq = (struct ip_mreqn *) alloca(optlen);
+			target_to_host_ip_mreq(ip_mreq, optval_addr, optlen);
+			ret = get_errno(setsockopt(sockfd, level, optname,
+				ip_mreq, optlen));
+			break;
+
+		default:
+			goto unimplemented;
+		}
+		break;
+
+
 	case TARGET_SOL_SOCKET:
 		switch (optname) {
 		/* Options with 'int' argument.  */

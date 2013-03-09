@@ -779,3 +779,18 @@ struct target_acl {
 	struct target_acl_entry		acl_entry[TARGET_ACL_MAX_ENTRIES];
 };
 
+
+/*
+ * netinet/in.h
+ */
+
+struct target_ip_mreq {
+	struct target_in_addr	imr_multiaddr;
+	struct target_in_addr 	imr_interface;
+};
+
+struct target_ip_mreqn {
+	struct target_in_addr	imr_multiaddr;
+	struct target_in_addr 	imr_address;
+	int32_t			imr_ifindex;
+};

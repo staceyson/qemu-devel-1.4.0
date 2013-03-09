@@ -45,8 +45,9 @@ print_sysctl(const struct syscallname *name,
 			gemu_log("%d ", tswap32(*p++));
 		unlock_user(namep, arg1, 0);
 	}
-	gemu_log("}, %u, %#lx, %#lx, %#lx, %#lx)",
-	    (uint32_t)arg2, arg3, arg4, arg5);
+	gemu_log("}, %u, 0x" TARGET_ABI_FMT_lx ", 0x" TARGET_ABI_FMT_lx ", 0x"
+	    TARGET_ABI_FMT_lx ", 0x" TARGET_ABI_FMT_lx ")",
+	    (uint32_t)arg2, arg3, arg4, arg5, arg6);
 }
 
 static void
