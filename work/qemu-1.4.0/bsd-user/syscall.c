@@ -467,6 +467,13 @@ sysctl_name2oid(uint32_t *holdp, size_t holdlen)
 		holdp[i] = tswap32(holdp[i]);
 }
 
+static inline void
+sysctl_oidfmt(uint32_t *holdp)
+{
+	/* byte swap the kind */
+	holdp[0] = tswap32(holdp[0]);
+}
+
 /* XXX this needs to be emulated on non-FreeBSD hosts... */
 static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong oldp,
                           abi_ulong oldlenp, abi_ulong newp, abi_ulong newlen)
@@ -529,10 +536,15 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
     }
 
     ret = get_errno(sysctl(snamep, namelen, holdp, &holdlen, hnewp, newlen));
-    if (!ret) {
-	if (0 == snamep[0] && 3 == snamep[1]) {
-		/* Handle the undocumented name2oid special case. */
-		sysctl_name2oid(holdp, holdlen);
+    if (!ret && (holdp != 0 && holdlen != 0)) {
+	if (0 == snamep[0] && (3 == snamep[1] || 4 == snamep[1])) {
+		if (3 == snamep[1]) {
+			/* Handle the undocumented name2oid special case. */
+			sysctl_name2oid(holdp, holdlen);
+		} else {
+			/* Handle oidfmt */
+			sysctl_oidfmt(holdp);
+		}
 	} else {
 		sysctl_oldcvt(holdp, holdlen, kind);
 	}
@@ -545,7 +557,8 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 #endif
 
 out:
-    put_user_ual(holdlen, oldlenp);
+    if (oldlenp)
+	    put_user_ual(holdlen, oldlenp);
     unlock_user(hnamep, namep, 0);
     unlock_user(holdp, oldp, holdlen);
     if (hnewp)
@@ -5648,11 +5661,11 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 		 case TARGET_F_SETLKW:
 			 if (!lock_user_struct(VERIFY_READ, target_fl, arg3, 1))
 				 return (-TARGET_EFAULT);
-			 fl.l_type = tswap16(target_fl->l_type);
-			 fl.l_whence = tswap16(target_fl->l_whence);
 			 fl.l_start = tswapal(target_fl->l_start);
 			 fl.l_len = tswapal(target_fl->l_len);
 			 fl.l_pid = tswap32(target_fl->l_pid);
+			 fl.l_type = tswap16(target_fl->l_type);
+			 fl.l_whence = tswap16(target_fl->l_whence);
 			 fl.l_sysid = tswap32(target_fl->l_sysid);
 			 unlock_user_struct(target_fl, arg3, 0);
 			 ret = get_errno(fcntl(arg1, host_cmd, &fl));
