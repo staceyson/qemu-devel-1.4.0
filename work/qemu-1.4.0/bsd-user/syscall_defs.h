@@ -203,12 +203,12 @@ struct target_pollfd {
 #include "openbsd/syscall_nr.h"
 
 struct target_flock {
-    unsigned long long l_start;
-    unsigned long long l_len;
-    int l_pid;
-    int l_sysid;
-    short l_type;
-    short l_whence;
+    abi_long l_start;
+    abi_long l_len;
+    int32_t l_pid;
+    int16_t l_type;
+    int16_t l_whence;
+    int32_t l_sysid;
 } QEMU_PACKED;
 
 struct target_iovec {
