@@ -768,7 +768,7 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
     {
 	    abi_ulong stack_hi_addr;
 	    size_t execpath_len;
-	    abi_ulong destp;
+	    abi_ulong destp, argvp, envp;
 	    struct target_ps_strings ps_strs;
 	    char canary[sizeof(abi_long) * 8];
 	    char execpath[PATH_MAX];
@@ -811,6 +811,7 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
 	    /* XXX - check return value of put_user_ual(). */
 	    put_user_ual(TARGET_PAGE_SIZE, p);
 
+	    argvp = p - TARGET_SPACE_USRSPACE;
 	    p = destp = p - TARGET_SPACE_USRSPACE - TARGET_ARG_MAX;
 
 	    /* XXX should check strlen(argv and envp strings) < TARGET_ARG_MAX */
@@ -819,31 +820,38 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
 	     * Add argv strings.  Note that the argv[] vectors are added by
 	     * loader_build_argptr()
 	     */
+	    envp = argvp + (bprm->argc + 2) * sizeof(abi_ulong);
+	    ps_strs.ps_argvstr = tswapl(argvp);
+	    ps_strs.ps_nargvstr = tswap32(bprm->argc);
 	    // i = bprm->argc;
 	    // while (i-- > 0) {
 	    for (i = 0; i < bprm->argc; ++i) {
 		    size_t len = strlen(bprm->argv[i]) + 1;
 		    /* XXX - check return value of memcpy_to_target(). */
 		    memcpy_to_target(destp, bprm->argv[i], len);
+		    put_user_ual(destp, argvp);
+		    argvp += sizeof(abi_ulong);
 		    destp += len;
 	    }
-	    ps_strs.ps_argvstr = tswapl(destp);
-	    ps_strs.ps_nargvstr = tswap32(bprm->argc);
+	    put_user_ual(0, argvp);
 
 	    /*
 	     * Add env strings. Note that the envp[] vectors are added by
 	     * loader_build_argptr().
 	     */
+	    ps_strs.ps_envstr = tswapl(envp);
+	    ps_strs.ps_nenvstr = tswap32(bprm->envc);
 	    // i = bprm->envc;
 	    // while(i-- > 0) {
 	    for (i = 0; i < bprm->envc; ++i) {
 		    size_t len = strlen(bprm->envp[i]) + 1;
 		    /* XXX - check return value of memcpy_to_target(). */
 		    memcpy_to_target(destp, bprm->envp[i], len);
+		    put_user_ual(destp, envp);
+		    envp += sizeof(abi_ulong);
 		    destp += len;
 	    }
-	    ps_strs.ps_envstr = tswapl(destp);
-	    ps_strs.ps_nenvstr = tswap32(bprm->envc);
+	    put_user_ual(0, envp);
 
 	    /* XXX - check return value of memcpy_to_target(). */
 	    memcpy_to_target(stack_hi_addr - sizeof(ps_strs), &ps_strs,
