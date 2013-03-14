@@ -30,7 +30,7 @@ CONFLICTS_INSTALL=	qemu-[0-9]*
 MAKE_JOBS_SAFE=	yes
 
 OPTIONS_DEFINE=	SAMBA SDL OPENGL GNUTLS SASL JPEG PNG CURL CDROM_DMA PCAP \
-		USBREDIR GNS3 ADD_AUDIO CLANG_HACK X86_TARGETS BSD_USER
+		USBREDIR GNS3 ADD_AUDIO CLANG_HACK X86_TARGETS BSD_USER STATIC_LINK
 SAMBA_DESC=		samba dependency (for -smb)
 GNUTLS_DESC=		gnutls dependency (vnc encryption)
 SASL_DESC=		cyrus-sasl dependency (vnc encryption)
@@ -46,6 +46,7 @@ ADD_AUDIO_DESC=		Emulate more audio hardware (experimental!)
 CLANG_HACK_DESC=		clang workaround (result slow and less stable!)
 X86_TARGETS_DESC=	Don't build non-x86 system targets
 BSD_USER_DESC=		Also build bsd-user targets (for testing)
+STATIC_LINK_DESC=	Statically link the executables
 OPTIONS_DEFAULT=SDL OPENGL GNUTLS SASL JPEG PNG CURL CDROM_DMA
 
 .include <bsd.port.options.mk>
@@ -157,6 +158,10 @@ RUN_DEPENDS+=	usbredir>=0.4.3:${PORTSDIR}/net/usbredir
 
 .if ${PORT_OPTIONS:MPCAP}
 CONFIGURE_ARGS+=	--enable-pcap
+.endif
+
+.if ${PORT_OPTIONS:MSTATIC_LINK}
+CONFIGURE_ARGS+=	--static
 .endif
 
 .if ${PORT_OPTIONS:MADD_AUDIO}

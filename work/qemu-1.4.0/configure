@@ -1238,6 +1238,11 @@ if test "$static" = "yes" ; then
   else
     pie="no"
   fi
+  if test "$bsd" = "yes" ; then
+    # Missing libs when linking statically
+    LIBS="$LIBS -lintl -lkvm"
+    libs_qga="-lintl $libs_qga"
+  fi
 fi
 
 if test "$pie" = ""; then

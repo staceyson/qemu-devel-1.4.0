@@ -877,6 +877,7 @@ int AES_set_decrypt_key(const unsigned char *userKey, const int bits,
 	return 0;
 }
 
+#if defined(CONFIG_STATIC) && ! defined(__FreeBSD__)
 #ifndef AES_ASM
 /*
  * Encrypt a single block
@@ -1312,3 +1313,4 @@ void AES_cbc_encrypt(const unsigned char *in, unsigned char *out,
 		}
 	}
 }
+#endif /* CONFIG_STATIC &&  ! __FreeBSD__ */
