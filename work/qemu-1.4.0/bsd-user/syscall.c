@@ -6457,7 +6457,7 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 	 break;
 
     case TARGET_FREEBSD_NR_seteuid:
-	 ret = get_errno(setegid(arg1));
+	 ret = get_errno(seteuid(arg1));
 	 break;
 
     case TARGET_FREEBSD_NR_getpgrp:
