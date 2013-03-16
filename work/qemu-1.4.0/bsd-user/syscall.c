@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
@@ -2016,19 +2017,17 @@ static inline abi_long
 target_to_host_ipc_perm(struct ipc_perm *host_ip, abi_ulong target_addr)
 {
 	struct target_ipc_perm *target_ip;
-	struct target_semid_ds *target_sd;
 
-	if (!lock_user_struct(VERIFY_READ, target_sd, target_addr, 1))
+	if (!lock_user_struct(VERIFY_READ, target_ip, target_addr, 1))
 		return (-TARGET_EFAULT);
-	target_ip = &(target_sd->sem_perm);
-	host_ip->cuid = tswapal(target_ip->cuid);
-	host_ip->cgid = tswapal(target_ip->cgid);
-	host_ip->uid = tswapal(target_ip->uid);
-	host_ip->gid = tswapal(target_ip->gid);
+	host_ip->cuid = tswap32(target_ip->cuid);
+	host_ip->cgid = tswap32(target_ip->cgid);
+	host_ip->uid = tswap32(target_ip->uid);
+	host_ip->gid = tswap32(target_ip->gid);
 	host_ip->mode = tswap16(target_ip->mode);
 	host_ip->seq = tswap16(target_ip->seq);
 	host_ip->key = tswapal(target_ip->key);
-	unlock_user_struct(target_sd, target_addr, 0);
+	unlock_user_struct(target_ip, target_addr, 0);
 
 	return (0);
 }
@@ -2037,18 +2036,17 @@ static inline abi_long
 host_to_target_ipc_perm(abi_ulong target_addr, struct ipc_perm *host_ip)
 {
 	struct target_ipc_perm *target_ip;
-	struct target_semid_ds *target_sd;
-	if (!lock_user_struct(VERIFY_WRITE, target_sd, target_addr, 0))
+
+	if (!lock_user_struct(VERIFY_WRITE, target_ip, target_addr, 0))
 		return (-TARGET_EFAULT);
-	target_ip = &(target_sd->sem_perm);
-	target_ip->cuid = tswapal(host_ip->cuid);
-	target_ip->cgid = tswapal(host_ip->cgid);
-	target_ip->uid = tswapal(host_ip->uid);
-	target_ip->gid = tswapal(host_ip->gid);
+	target_ip->cuid = tswap32(host_ip->cuid);
+	target_ip->cgid = tswap32(host_ip->cgid);
+	target_ip->uid = tswap32(host_ip->uid);
+	target_ip->gid = tswap32(host_ip->gid);
 	target_ip->mode = tswap16(host_ip->mode);
 	target_ip->seq = tswap16(host_ip->seq);
 	target_ip->key = tswapal(host_ip->key);
-	unlock_user_struct(target_sd, target_addr, 1);
+	unlock_user_struct(target_ip, target_addr, 1);
 	return (0);
 }
 
@@ -2059,11 +2057,12 @@ target_to_host_semid_ds(struct semid_ds *host_sd, abi_ulong target_addr)
 
 	if (!lock_user_struct(VERIFY_READ, target_sd, target_addr, 1))
 		return (-TARGET_EFAULT);
-	if (target_to_host_ipc_perm(&(host_sd->sem_perm), target_addr))
+	if (target_to_host_ipc_perm(&(host_sd->sem_perm), (target_addr +
+		offsetof(struct target_semid_ds, sem_perm)) ))
 		return (-TARGET_EFAULT);
 	/* sem_base is not used by kernel for IPC_STAT/IPC_SET */
-	host_sd->sem_base  = NULL;
-	host_sd->sem_nsems = tswapal(target_sd->sem_nsems);
+	host_sd->sem_base  = g2h(target_sd->sem_base);
+	host_sd->sem_nsems = tswap16(target_sd->sem_nsems);
 	host_sd->sem_otime = tswapal(target_sd->sem_otime);
 	host_sd->sem_ctime = tswapal(target_sd->sem_ctime);
 	unlock_user_struct(target_sd, target_addr, 0);
@@ -2077,10 +2076,13 @@ host_to_target_semid_ds(abi_ulong target_addr, struct semid_ds *host_sd)
 
 	if (!lock_user_struct(VERIFY_WRITE, target_sd, target_addr, 0))
 		return (-TARGET_EFAULT);
-	if (host_to_target_ipc_perm(target_addr,&(host_sd->sem_perm)))
+	if (host_to_target_ipc_perm((target_addr +
+		offsetof(struct target_semid_ds, sem_perm)),
+		&(host_sd->sem_perm)))
 		return (-TARGET_EFAULT);
 	/* sem_base is not used by kernel for IPC_STAT/IPC_SET */
-	target_sd->sem_nsems = tswapal(host_sd->sem_nsems);
+	target_sd->sem_base = h2g((void *)host_sd->sem_base);
+	target_sd->sem_nsems = tswap16(host_sd->sem_nsems);
 	target_sd->sem_otime = tswapal(host_sd->sem_otime);
 	target_sd->sem_ctime = tswapal(host_sd->sem_ctime);
 	unlock_user_struct(target_sd, target_addr, 1);
@@ -2096,6 +2098,7 @@ do_semctl(int semid, int semnum, int cmd, union target_semun target_su)
 	unsigned short *array = NULL;
 	abi_long ret = -TARGET_EINVAL;
 	abi_long err;
+	abi_ulong target_addr;
 
 	cmd &= 0xff;
 
@@ -2121,12 +2124,14 @@ do_semctl(int semid, int semnum, int cmd, union target_semun target_su)
 
 	case IPC_STAT:
 	case IPC_SET:
-		err = target_to_host_semid_ds(&dsarg, target_su.buf);
+		if (get_user_ual(target_addr, (abi_ulong)target_su.buf))
+			return (-TARGET_EFAULT);
+		err = target_to_host_semid_ds(&dsarg, target_addr);
 		if (err)
 			return (err);
 		arg.buf = &dsarg;
 		ret = get_errno(semctl(semid, semnum, cmd, arg));
-		err = host_to_target_semid_ds(target_su.buf, &dsarg);
+		err = host_to_target_semid_ds(target_addr, &dsarg);
 		if (err)
 			return (err);
 		break;
@@ -6375,6 +6380,10 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 
     case TARGET_FREEBSD_NR___semctl:
 	 ret = do_semctl(arg1, arg2, arg3, (union target_semun)(abi_ulong)arg4);
+	 break;
+
+    case TARGET_FREEBSD_NR_freebsd7___semctl:
+	 ret = unimplemented(num);
 	 break;
 
     case TARGET_FREEBSD_NR_msgctl:
