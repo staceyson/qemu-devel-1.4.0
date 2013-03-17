@@ -2061,7 +2061,7 @@ target_to_host_semid_ds(struct semid_ds *host_sd, abi_ulong target_addr)
 		offsetof(struct target_semid_ds, sem_perm)) ))
 		return (-TARGET_EFAULT);
 	/* sem_base is not used by kernel for IPC_STAT/IPC_SET */
-	host_sd->sem_base  = g2h(target_sd->sem_base);
+	/* host_sd->sem_base  = g2h(target_sd->sem_base); */
 	host_sd->sem_nsems = tswap16(target_sd->sem_nsems);
 	host_sd->sem_otime = tswapal(target_sd->sem_otime);
 	host_sd->sem_ctime = tswapal(target_sd->sem_ctime);
@@ -2081,7 +2081,7 @@ host_to_target_semid_ds(abi_ulong target_addr, struct semid_ds *host_sd)
 		&(host_sd->sem_perm)))
 		return (-TARGET_EFAULT);
 	/* sem_base is not used by kernel for IPC_STAT/IPC_SET */
-	target_sd->sem_base = h2g((void *)host_sd->sem_base);
+	/* target_sd->sem_base = h2g((void *)host_sd->sem_base); */
 	target_sd->sem_nsems = tswap16(host_sd->sem_nsems);
 	target_sd->sem_otime = tswapal(host_sd->sem_otime);
 	target_sd->sem_ctime = tswapal(host_sd->sem_ctime);

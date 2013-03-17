@@ -207,9 +207,10 @@ target_to_host_sigset(sigset_t *d, const target_sigset_t *s)
 static inline void
 host_to_target_siginfo_noswap(target_siginfo_t *tinfo, const siginfo_t *info)
 {
-	int sig;
+	int sig, code;
 
 	sig = host_to_target_signal(info->si_signo);
+	code = tswap32(info->si_code);  /* XXX should have host_to_target_si_code() */
 	tinfo->si_signo = sig;
 	tinfo->si_errno = info->si_errno;
 	tinfo->si_code = info->si_code;
@@ -222,11 +223,13 @@ host_to_target_siginfo_noswap(target_siginfo_t *tinfo, const siginfo_t *info)
 	if (SIGILL == sig || SIGFPE == sig || SIGSEGV == sig ||
 	    SIGBUS == sig || SIGTRAP == sig) {
 		tinfo->_reason._fault._trapno = info->_reason._fault._trapno;
+	}
 #ifdef SIGPOLL
-	} else if (SIGPOLL == sig) {
+	if (SIGPOLL == sig) {
 		tinfo->_reason._poll._band = info->_reason._poll._band;
+	}
 #endif
-	} else {
+	if (SI_TIMER == code) {
 		tinfo->_reason._timer._timerid = info->_reason._timer._timerid;
 		tinfo->_reason._timer._overrun = info->_reason._timer._overrun;
 	}
@@ -235,8 +238,10 @@ host_to_target_siginfo_noswap(target_siginfo_t *tinfo, const siginfo_t *info)
 static void
 tswap_siginfo(target_siginfo_t *tinfo, const target_siginfo_t *info)
 {
-	int sig;
+	int sig, code;
+
 	sig = info->si_signo;
+	code = info->si_code;
 	tinfo->si_signo = tswap32(sig);
 	tinfo->si_errno = tswap32(info->si_errno);
 	tinfo->si_code = tswap32(info->si_code);
@@ -247,11 +252,13 @@ tswap_siginfo(target_siginfo_t *tinfo, const target_siginfo_t *info)
 	    SIGBUS == sig || SIGTRAP == sig) {
 		tinfo->_reason._fault._trapno =
 		    tswap32(info->_reason._fault._trapno);
+	}
 #ifdef SIGPOLL
-	} else if (SIGPOLL == sig) {
+	if (SIGPOLL == sig) {
 		tinfo->_reason._poll._band = tswap32(info->_reason._poll._band);
+	}
 #endif
-	} else {
+	if (SI_TIMER == code) {
 		tinfo->_reason._timer._timerid =
 		    tswap32(info->_reason._timer._timerid);
 		tinfo->_reason._timer._overrun =
@@ -606,7 +613,7 @@ do_sigaction(int sig, const struct target_sigaction *act,
 	return (ret);
 }
 
-#if defined(TARGET_MIPS) || defined(TARGET_SPARC64)
+#if defined(TARGET_MIPS64) /* || defined(TARGET_SPARC64) */
 
 static inline abi_ulong
 get_sigframe(struct target_sigaction *ka, CPUArchState *regs, size_t frame_size)
@@ -629,8 +636,8 @@ get_sigframe(struct target_sigaction *ka, CPUArchState *regs, size_t frame_size)
 }
 
 /* compare to mips/mips/pm_machdep.c and sparc64/sparc64/machdep.c sendsig() */
-static void setup_frame(int sig, struct target_sigaction *ka,
-    target_sigset_t *set, CPUArchState *regs)
+static void setup_frame(int sig, int code, struct target_sigaction *ka,
+    target_sigset_t *set, target_siginfo_t *tinfo, CPUArchState *regs)
 {
 	struct target_sigframe *frame;
 	abi_ulong frame_addr;
@@ -651,6 +658,7 @@ static void setup_frame(int sig, struct target_sigaction *ka,
 	if (!lock_user_struct(VERIFY_WRITE, frame, frame_addr, 0))
 		goto give_sigsegv;
 
+	memset(frame, 0, sizeof(*frame));
 #if defined(TARGET_MIPS)
 	int mflags = on_sig_stack(frame_addr) ? TARGET_MC_ADD_MAGIC :
 	    TARGET_MC_SET_ONSTACK | TARGET_MC_ADD_MAGIC;
@@ -665,6 +673,58 @@ static void setup_frame(int sig, struct target_sigaction *ka,
 			&frame->sf_uc.uc_sigmask.__bits[i]))
 			goto give_sigsegv;
 	}
+
+	if (tinfo) {
+		frame->sf_si.si_signo = tinfo->si_signo;
+		frame->sf_si.si_errno = tinfo->si_errno;
+		frame->sf_si.si_code = tinfo->si_code;
+		frame->sf_si.si_pid = tinfo->si_pid;
+		frame->sf_si.si_uid = tinfo->si_uid;
+		frame->sf_si.si_status = tinfo->si_status;
+		frame->sf_si.si_addr = tinfo->si_addr;
+
+		if (TARGET_SIGILL == sig || TARGET_SIGFPE == sig ||
+		    TARGET_SIGSEGV == sig || TARGET_SIGBUS == sig ||
+		    TARGET_SIGTRAP == sig)
+			frame->sf_si._reason._fault._trapno =
+			    tinfo->_reason._fault._trapno;
+
+		/*
+		 * If si_code is one of SI_QUEUE, SI_TIMER, SI_ASYNCIO, or
+		 * SI_MESGQ, then si_value contains the application-specified
+		 * signal value. Otherwise, the contents of si_value are
+		 * undefined.
+		 */
+		if (SI_QUEUE == code || SI_TIMER == code ||
+		    SI_ASYNCIO == code || SI_MESGQ == code) {
+			frame->sf_si.si_value.sival_int =
+			    tinfo->si_value.sival_int;
+		}
+
+		if (SI_TIMER == code) {
+			frame->sf_si._reason._timer._timerid =
+			    tinfo->_reason._timer._timerid;
+			frame->sf_si._reason._timer._overrun =
+			    tinfo->_reason._timer._overrun;
+		}
+
+#ifdef SIGPOLL
+		if (SIGPOLL == sig) {
+			frame->sf_si._reason._band =
+			    tinfo->_reason._band;
+		}
+#endif
+
+		frame->sf_signum = sig;
+		frame->sf_siginfo = (abi_ulong)&frame->sf_si;
+		frame->sf_ucontext = (abi_ulong)&frame->sf_uc;
+
+	} else {
+		frame->sf_signum = sig;
+		frame->sf_siginfo = 0;
+		frame->sf_ucontext = 0;
+	}
+
 
 	if (set_sigtramp_args(regs, sig, frame, frame_addr, ka))
 		goto give_sigsegv;
@@ -866,8 +926,8 @@ get_sigframe(struct target_sigaction *ka, CPUSPARCState *regs, size_t frame_size
 }
 
 /* compare to sparc64/sparc64/machdep.c sendsig() */
-static void setup_frame(int sig, struct target_sigaction *ka,
-    target_sigset_t *set, CPUSPARCState *regs)
+static void setup_frame(int sig, int code, struct target_sigaction *ka,
+    target_sigset_t *set, target_siginfo_t *tinfo, CPUSPARCState *regs)
 {
 	struct target_sigframe *frame;
 	abi_ulong frame_addr;
@@ -960,20 +1020,11 @@ badframe:
 #else
 
 static void
-setup_frame(int sig, struct target_sigaction *ka, target_sigset_t *set,
-    CPUArchState *env)
+setup_frame(int sig, int code, struct target_sigaction *ka, target_sigset_t *set,
+    target_siginfo_t *tinfo, CPUArchState *env)
 {
 	fprintf(stderr, "setup_frame: not implemented\n");
 }
-
-#if 0
-static void
-setup_rt_frame(int sig, struct target_sigaction *ka, target_siginfo_t *info,
-    target_sigset_t *set, CPUArchState *env)
-{
-	fprintf(stderr, "setup_rt_frame: not implemented\n");
-}
-#endif
 
 long
 do_sigreturn(CPUArchState *env, abi_ulong uc_addr)
@@ -1043,10 +1094,11 @@ signal_init(void)
 void
 process_pending_signals(CPUArchState *cpu_env)
 {
-	int sig;
+	int sig, code;
 	abi_ulong handler;
 	sigset_t set, old_set;
 	target_sigset_t target_old_set;
+	target_siginfo_t tinfo;
 	struct emulated_sigtable *k;
 	struct target_sigaction *sa;
 	struct qemu_sigqueue *q;
@@ -1143,14 +1195,16 @@ handle_signal:
 		}
 #endif
 #endif
+		code = q->info.si_code;
 		/* prepare the stack frame of the virtual CPU */
-#if 0  /* XXX no rt for fbsd */
-		 if (sa->sa_flags & TARGET_SA_SIGINFO)
-			 setup_rt_frame(sig, sa, &q->info, &target_old_set,
+		 if (sa->sa_flags & TARGET_SA_SIGINFO) {
+			 tswap_siginfo(&tinfo, &q->info);
+			 setup_frame(sig, code, sa, &target_old_set, &tinfo,
 			     cpu_env);
-		 else
-#endif
-		 setup_frame(sig, sa, &target_old_set, cpu_env);
+		 } else {
+			 setup_frame(sig, code, sa, &target_old_set, NULL,
+			     cpu_env);
+		 }
 		 if (sa->sa_flags & TARGET_SA_RESETHAND)
 			 sa->_sa_handler = TARGET_SIG_DFL;
 	}

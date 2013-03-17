@@ -65,13 +65,7 @@ set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
     abi_ulong frame_addr, struct target_sigaction *ka)
 {
 
-	frame->sf_signum = sig;
-	frame->sf_siginfo = 0;
-	frame->sf_ucontext = 0;
-
-	frame->sf_si.si_signo = sig;
-	frame->sf_si.si_code = TARGET_SA_SIGINFO;
-	frame->sf_si.si_addr = regs->CP0_BadVAddr;
+	/* frame->sf_si.si_addr = regs->CP0_BadVAddr; */
 
 	/*
 	 * Arguments to signal handler:
@@ -86,6 +80,8 @@ set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
 	regs->active_tc.gpr[ 4] = sig;
 	regs->active_tc.gpr[ 5] = frame_addr +
 	    offsetof(struct target_sigframe, sf_si);
+	regs->active_tc.gpr[ 6] = frame_addr +
+	    offsetof(struct target_sigframe, sf_uc);
 	regs->active_tc.gpr[25] = regs->active_tc.PC = ka->_sa_handler;
 	regs->active_tc.gpr[29] = frame_addr;
 	regs->active_tc.gpr[31] = TARGET_PS_STRINGS - TARGET_SZSIGCODE;
