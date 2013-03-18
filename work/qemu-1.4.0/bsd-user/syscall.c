@@ -2009,13 +2009,15 @@ target_to_host_semarray(int semid, unsigned short **host_array,
 	if (ret == -1)
 		return (get_errno(ret));
 	nsems = semid_ds.sem_nsems;
-	*host_array = malloc(nsems * sizeof(unsigned short));
+	*host_array = (unsigned short *)malloc(nsems * sizeof(unsigned short));
 	array = lock_user(VERIFY_READ, target_addr,
 	    nsems*sizeof(unsigned short), 1);
-	if (!array)
+	if (!array) {
+		free(*host_array);
 		return (-TARGET_EFAULT);
+	}
 	for(i=0; i<nsems; i++) {
-		__get_user((*host_array)[i], &array[i]);
+		(*host_array)[i] = array[i];
 	}
 	unlock_user(array, target_addr, 0);
 
@@ -2035,18 +2037,21 @@ host_to_target_semarray(int semid, abi_ulong target_addr,
 	semun.buf = &semid_ds;
 
 	ret = semctl(semid, 0, IPC_STAT, semun);
-	if (ret == -1)
+	if (ret == -1) {
+		free(*host_array);
 		return get_errno(ret);
+	}
 
 	nsems = semid_ds.sem_nsems;
-
-	array = lock_user(VERIFY_WRITE, target_addr,
+	array = (unsigned short *)lock_user(VERIFY_WRITE, target_addr,
 	    nsems*sizeof(unsigned short), 0);
-	 if (!array)
+	 if (!array) {
+		 free(*host_array);
 		 return (-TARGET_EFAULT);
+	 }
 
 	 for(i=0; i<nsems; i++) {
-		 __put_user((*host_array)[i], &array[i]);
+		 array[i] = (*host_array)[i];
 	 }
 	 free(*host_array);
 	 unlock_user(array, target_addr, 1);
@@ -2153,12 +2158,14 @@ do_semctl(int semid, int semnum, int cmd, union target_semun target_su)
 
 	case GETALL:
 	case SETALL:
-		err = target_to_host_semarray(semid, &array, target_su.array);
+		if (get_user_ual(target_addr, (abi_ulong)target_su.array))
+			return (-TARGET_EFAULT);
+		err = target_to_host_semarray(semid, &array, target_addr);
 		if (err)
 			return (err);
 		arg.array = array;
 		ret = get_errno(semctl(semid, semnum, cmd, arg));
-		err = host_to_target_semarray(semid, target_su.array, &array);
+		err = host_to_target_semarray(semid, target_addr, &array);
 		if (err)
 			return (err);
 		break;
