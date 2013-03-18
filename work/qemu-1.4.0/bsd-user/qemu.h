@@ -224,6 +224,7 @@ void mmap_fork_end(int child);
 /* main.c */
 extern unsigned long x86_stack_size;
 extern char qemu_proc_pathname[];
+extern char target_proc_pathname[];
 
 /* user access */
 

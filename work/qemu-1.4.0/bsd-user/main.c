@@ -62,6 +62,7 @@ unsigned long x86_stack_size = 512 * 1024;
 
 static void save_proc_pathname(void);
 char qemu_proc_pathname[PATH_MAX];
+char target_proc_pathname[PATH_MAX];
 
 #ifdef __FreeBSD__
 static void

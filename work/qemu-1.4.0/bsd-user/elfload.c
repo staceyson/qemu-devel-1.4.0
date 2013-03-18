@@ -798,6 +798,7 @@ static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
 		    p -= roundup(execpath_len, sizeof(abi_ulong));
 		    /* XXX - check return value of memcpy_to_target() */
 		    memcpy_to_target(p, execpath, execpath_len);
+		    strlcpy(target_proc_pathname, execpath, execpath_len);
 	    }
 
 	    /* Add canary for SSP. */

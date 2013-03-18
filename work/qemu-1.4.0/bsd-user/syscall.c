@@ -485,8 +485,6 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
     abi_ulong oldlen = 0;
     int32_t *snamep = g_malloc(sizeof(int32_t) * namelen), *p, *q, i;
     uint32_t kind = 0;
-    abi_ulong argv, argv0;
-    char *fullpath = NULL;
 
     if (oldlenp)
         if (get_user_ual(oldlen, oldlenp))
@@ -533,30 +531,14 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 	    case KERN_PROC:
 		    switch(snamep[2]) {
 		    case KERN_PROC_PATHNAME:
-			    if (get_user_ual(argv, TARGET_PS_STRINGS)) {
-				    ret = -TARGET_EFAULT;
-				    goto out;
-			    }
-			    if (get_user_ual(argv0, argv)) {
-				    ret = -TARGET_EFAULT;
-				    goto out;
-			    }
-
-			    fullpath = realpath(g2h(argv0), NULL);
-			    if (NULL == fullpath)
-				    fullpath = (char *)g2h(argv0);
-			    holdlen = strlen(fullpath) + 1;
+			    holdlen = strlen(target_proc_pathname) + 1;
 			    if (holdp) {
 				    if (oldlen < holdlen) {
 					    ret = -TARGET_EINVAL;
 					    goto out;
 				    }
-				    if (!access_ok(VERIFY_WRITE, argv0,
-					    holdlen)) {
-					    ret = -TARGET_EFAULT;
-					    goto out;
-				    }
-				    strlcpy(holdp, fullpath, oldlen);
+				    strlcpy(holdp, target_proc_pathname,
+					oldlen);
 			    }
 			    ret = 0;
 			    goto out;
@@ -597,8 +579,6 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 #endif
 
 out:
-    if (fullpath)
-	    free(fullpath);
     if (oldlenp)
 	    put_user_ual(holdlen, oldlenp);
     unlock_user(hnamep, namep, 0);
