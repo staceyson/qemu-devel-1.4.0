@@ -5,7 +5,6 @@
 
 #define	TARGET_MINSIGSTKSZ	(512 * 4)
 #define	TARGET_SIGSTKSZ		(TARGET_MINSIGSTKSZ + 32768)
-#define	TARGET_SZSIGCODE	16
 
 struct target_sigcontext {
 	target_sigset_t	sc_mask;        /* signal mask to retstore */
@@ -56,9 +55,29 @@ get_sp_from_cpustate(CPUMIPSState *state)
     return state->active_tc.gpr[29];
 }
 
+#define	TARGET_SZSIGCODE	(4 * 4)
+
+/* Compare to mips/mips/locore.S sigcode() */
+static inline int
+install_sigtramp(abi_ulong offset, unsigned sigf_uc, unsigned sys_sigreturn)
+{
+	int i;
+	uint32_t sigtramp_code[] = {
+	/* 1 */	0x67A40000 + sigf_uc,		/* daddu   $a0, $sp, (sigf_uc) */
+	/* 2 */	0x24020000 + sys_sigreturn,	/* li      $v0, (sys_sigreturn) */
+	/* 3 */	0x0000000C,             	/* syscall */
+	/* 4 */	0x0000000D              	/* break */
+	};
+
+	for(i = 0; i < 4; i++)
+		tswap32s(&sigtramp_code[i]);
+
+	return (memcpy_to_target(offset, sigtramp_code, TARGET_SZSIGCODE));
+}
+
 /*
  * Compare to mips/mips/pm_machdep.c sendsig()
- * Assumes that "frame" memory is locked.
+ * Assumes that target stack frame memory is locked.
  */
 static inline int
 set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
@@ -66,6 +85,11 @@ set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
 {
 
 	/* frame->sf_si.si_addr = regs->CP0_BadVAddr; */
+
+	/* MIPS only struct target_sigframe members: */
+	frame->sf_signum = sig;
+	frame->sf_siginfo = (abi_ulong)&frame->sf_si;
+	frame->sf_ucontext = (abi_ulong)&frame->sf_uc;
 
 	/*
 	 * Arguments to signal handler:

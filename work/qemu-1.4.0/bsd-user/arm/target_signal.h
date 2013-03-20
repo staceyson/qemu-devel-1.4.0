@@ -28,11 +28,6 @@
 
 #define	TARGET_GET_MC_CLEAR_RET	1
 
-static inline abi_ulong get_sp_from_cpustate(CPUARMState *state)
-{
-    return state->regs[13];
-}
-
 #define	TARGET_MINSIGSTKSZ	(1024 * 4)
 #define	TARGET_SIGSTKSZ		(TARGET_MINSIGSTKSZ + 32768)
 #define	TARGET__NGREG		17
@@ -68,6 +63,82 @@ typedef struct target_ucontext {
 	int32_t			uc_flags;
 	int32_t			__spare__[4];
 } target_ucontext_t;
+
+struct target_sigframe {
+	target_siginfo_t	sf_si;	/* saved siginfo */
+	target_ucontext_t	sf_uc;	/* saved ucontext */
+};
+
+#define	TARGET_SZSIGCODE	(8 * 4)
+
+/* Compare to arm/arm/locore.S ENTRY_NP(sigcode) */
+static inline int
+install_sigtramp(abi_ulong offset, unsigned sigf_us, uint32_t sys_sigreturn)
+{
+	int i;
+	uint32_t sys_exit = TARGET_FREEBSD_NR_exit;
+	/*
+	 * The code has to load r7 manually rather than using
+	 * "ldr r7, =SYS_return to make sure the size of the
+	 * code is correct.
+	 */
+	uint32_t sigtramp_code[] = {
+	/* 1 */	0xE1A0000D,			/* mov r0, sp */
+	/* 2 */	0xE59F700C,			/* ldr r7, [pc, #12] */
+	/* 3 */	0xEF000000 + sys_sigreturn,	/* swi (SYS_sigreturn) */
+	/* 4 */	0xE59F7008,			/* ldr r7, [pc, #8] */
+	/* 5 */	0xEF000000 + sys_exit, 		/* swi (SYS_exit)*/
+	/* 6 */	0xEAFFFFFA,			/* b . -16 */
+	/* 7 */	sys_sigreturn,
+	/* 8 */	sys_exit
+	};
+
+	for(i = 0; i < 8; i++)
+		tswap32s(&sigtramp_code[i]);
+
+	return(memcpy_to_target(offset, sigtramp_code, TARGET_SZSIGCODE));
+}
+
+static inline abi_ulong
+get_sp_from_cpustate(CPUARMState *state)
+{
+    return state->regs[13]; /* sp */
+}
+
+/*
+ * Compare to arm/arm/machdep.c sendsig()
+ * Assumes that the target stack frame memory is locked.
+ */
+static inline int
+set_sigtramp_args(CPUARMState *regs, int sig, struct target_sigframe *frame,
+    abi_ulong frame_addr, struct target_sigaction *ka)
+{
+	/*
+	 * Arguments to signal handler:
+	 * 	r0 = signal number
+	 * 	r1 = siginfo pointer
+	 * 	r2 = ucontext pointer
+	 * 	r5 = ucontext pointer
+	 * 	pc = signal handler pointer
+	 * 	sp = sigframe struct pointer
+	 * 	lr = sigtramp at base of user stack
+	 */
+
+	regs->regs[0] = sig;
+	regs->regs[1] = frame_addr +
+	    offsetof(struct target_sigframe, sf_si);
+	regs->regs[2] = frame_addr +
+	    offsetof(struct target_sigframe, sf_uc);
+
+	/* the trampoline uses r5 as the uc address */
+	regs->regs[5] = frame_addr +
+	    offsetof(struct target_sigframe, sf_uc);
+	regs->regs[TARGET_REG_PC] = ka->_sa_handler;
+	regs->regs[TARGET_REG_SP] = frame_addr;
+	regs->regs[TARGET_REG_LR] = TARGET_PS_STRINGS - TARGET_SZSIGCODE;
+
+	return (0);
+}
 
 /* Compare to arm/arm/machdep.c get_mcontext() */
 static inline int

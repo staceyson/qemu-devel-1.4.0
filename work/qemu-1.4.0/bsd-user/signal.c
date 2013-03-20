@@ -613,7 +613,7 @@ do_sigaction(int sig, const struct target_sigaction *act,
 	return (ret);
 }
 
-#if defined(TARGET_MIPS64) /* || defined(TARGET_SPARC64) */
+#if defined(TARGET_MIPS64) || defined(TARGET_ARM)
 
 static inline abi_ulong
 get_sigframe(struct target_sigaction *ka, CPUArchState *regs, size_t frame_size)
@@ -715,16 +715,7 @@ static void setup_frame(int sig, int code, struct target_sigaction *ka,
 		}
 #endif
 
-		frame->sf_signum = sig;
-		frame->sf_siginfo = (abi_ulong)&frame->sf_si;
-		frame->sf_ucontext = (abi_ulong)&frame->sf_uc;
-
-	} else {
-		frame->sf_signum = sig;
-		frame->sf_siginfo = 0;
-		frame->sf_ucontext = 0;
 	}
-
 
 	if (set_sigtramp_args(regs, sig, frame, frame_addr, ka))
 		goto give_sigsegv;

@@ -690,24 +690,6 @@ static abi_ulong copy_elf_strings(int argc,char ** argv, void **page,
     return p;
 }
 
-#if defined(TARGET_MIPS64)
-static inline int
-install_sigtramp(abi_ulong offset, unsigned sigf_uc, unsigned syscall)
-{
-	int i;
-	uint32_t sigtramp_code[] = {
-		0x67A40000 + sigf_uc,   /* daddu   $a0, $sp, (sigf_uc) */
-		0x24020000 + syscall,   /* li      $v0, (syscall) */
-		0x0000000C,             /* syscall */
-		0x0000000D              /* break */
-	};
-
-	for(i = 0; i < 4; i++)
-		tswap32s(&sigtramp_code[i]);
-
-	return (memcpy_to_target(offset, sigtramp_code, TARGET_SZSIGCODE));
-}
-#endif
 
 static abi_ulong setup_arg_pages(abi_ulong p, struct bsd_binprm *bprm,
                                  struct image_info *info)
