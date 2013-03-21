@@ -26,8 +26,6 @@
 #define	TARGET_REG_LR	TARGET_REG_R14
 #define	TARGET_REG_PC	TARGET_REG_R15
 
-#define	TARGET_GET_MC_CLEAR_RET	1
-
 #define	TARGET_MINSIGSTKSZ	(1024 * 4)
 #define	TARGET_SIGSTKSZ		(TARGET_MINSIGSTKSZ + 32768)
 #define	TARGET__NGREG		17
@@ -144,20 +142,32 @@ set_sigtramp_args(CPUARMState *regs, int sig, struct target_sigframe *frame,
 static inline int
 get_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int clear_ret)
 {
-	int i, err = 0;
+	int err = 0;
 	uint32_t *gr = mcp->__gregs;
 
 
-	if (clear_ret & TARGET_GET_MC_CLEAR_RET)
+	if (clear_ret & TARGET_MC_GET_CLEAR_RET)
 		gr[TARGET_REG_R0] = 0;
 	else
 		gr[TARGET_REG_R0] = tswap32(regs->regs[0]);
-	for(i = 1; i < 12; i++)
-		gr[i] = tswap32(regs->regs[i]);
+
+	gr[TARGET_REG_R1 ] = tswap32(regs->regs[ 1]);
+	gr[TARGET_REG_R2 ] = tswap32(regs->regs[ 2]);
+	gr[TARGET_REG_R3 ] = tswap32(regs->regs[ 3]);
+	gr[TARGET_REG_R4 ] = tswap32(regs->regs[ 4]);
+	gr[TARGET_REG_R5 ] = tswap32(regs->regs[ 5]);
+	gr[TARGET_REG_R6 ] = tswap32(regs->regs[ 6]);
+	gr[TARGET_REG_R7 ] = tswap32(regs->regs[ 7]);
+	gr[TARGET_REG_R8 ] = tswap32(regs->regs[ 8]);
+	gr[TARGET_REG_R9 ] = tswap32(regs->regs[ 9]);
+	gr[TARGET_REG_R10] = tswap32(regs->regs[10]);
+	gr[TARGET_REG_R11] = tswap32(regs->regs[11]);
+	gr[TARGET_REG_R12] = tswap32(regs->regs[12]);
+
 	gr[TARGET_REG_SP] = tswap32(regs->regs[13]);
 	gr[TARGET_REG_LR] = tswap32(regs->regs[14]);
 	gr[TARGET_REG_PC] = tswap32(regs->regs[15]);
-	gr[TARGET_REG_CPSR] = tswap32(regs->spsr);
+	gr[TARGET_REG_CPSR] = tswap32(cpsr_read(regs));
 
 	return (err);
 }
@@ -166,15 +176,29 @@ get_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int clear_ret)
 static inline int
 set_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int flags)
 {
-	int i, err = 0;
+	int err = 0;
 	const uint32_t *gr = mcp->__gregs;
+	uint32_t cpsr;
 
-	for(i = 0; i < 12; i++)
-		regs->regs[i] =  tswap32(gr[i]);
+	regs->regs[ 0] = tswap32(gr[TARGET_REG_R0 ]);
+	regs->regs[ 1] = tswap32(gr[TARGET_REG_R1 ]);
+	regs->regs[ 2] = tswap32(gr[TARGET_REG_R2 ]);
+	regs->regs[ 3] = tswap32(gr[TARGET_REG_R3 ]);
+	regs->regs[ 4] = tswap32(gr[TARGET_REG_R4 ]);
+	regs->regs[ 5] = tswap32(gr[TARGET_REG_R5 ]);
+	regs->regs[ 6] = tswap32(gr[TARGET_REG_R6 ]);
+	regs->regs[ 7] = tswap32(gr[TARGET_REG_R7 ]);
+	regs->regs[ 8] = tswap32(gr[TARGET_REG_R8 ]);
+	regs->regs[ 9] = tswap32(gr[TARGET_REG_R9 ]);
+	regs->regs[10] = tswap32(gr[TARGET_REG_R10]);
+	regs->regs[11] = tswap32(gr[TARGET_REG_R11]);
+	regs->regs[12] = tswap32(gr[TARGET_REG_R12]);
+
 	regs->regs[13] = tswap32(gr[TARGET_REG_SP]);
 	regs->regs[14] = tswap32(gr[TARGET_REG_LR]);
 	regs->regs[15] = tswap32(gr[TARGET_REG_PC]);
-	regs->spsr = tswap32(gr[TARGET_REG_CPSR]);
+	cpsr = tswap32(gr[TARGET_REG_CPSR]);
+	cpsr_write(regs, cpsr, CPSR_USER | CPSR_EXEC);
 
 	return (err);
 }
