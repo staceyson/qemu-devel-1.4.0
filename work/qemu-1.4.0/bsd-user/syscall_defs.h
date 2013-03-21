@@ -132,8 +132,8 @@
 #define	TARGET_TRAP_TRACE	(2)	/* process trace trap */
 
 struct target_rlimit {
-	abi_ulong rlim_cur;
-	abi_ulong rlim_max;
+	uint64_t rlim_cur;
+	uint64_t rlim_max;
 };
 
 #if defined(TARGET_ALPHA)
