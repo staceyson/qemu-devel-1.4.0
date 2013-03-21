@@ -671,7 +671,7 @@ target_to_host_sockaddr(struct sockaddr *addr, abi_ulong target_addr,
 	if (!target_saddr)
 		return -TARGET_EFAULT;
 
-	sa_family = tswap16(target_saddr->sa_family);
+	sa_family = target_saddr->sa_family;
 
 	/*
 	 * Oops. The caller might send a incomplete sun_path; sun_path
@@ -680,7 +680,7 @@ target_to_host_sockaddr(struct sockaddr *addr, abi_ulong target_addr,
 	 * "strlen(x->sun_path)" while it should be "strlen(...) + 1". We will
 	 * fix that here if needed.
 	 */
-	if (sa_family == AF_UNIX) {
+	if (target_saddr->sa_family == AF_UNIX) {
 		if (len < unix_maxlen && len > 0) {
 			char *cp = (char*)target_saddr;
 
@@ -692,7 +692,8 @@ target_to_host_sockaddr(struct sockaddr *addr, abi_ulong target_addr,
 	}
 
 	memcpy(addr, target_saddr, len);
-	addr->sa_family = sa_family;
+	addr->sa_family = sa_family;		/* type uint8_t */
+	addr->sa_len = target_saddr->sa_len;	/* type uint8_t */
 	unlock_user(target_saddr, target_addr, 0);
 
 	return (0);
@@ -708,7 +709,8 @@ host_to_target_sockaddr(abi_ulong target_addr, struct sockaddr *addr,
 	if (!target_saddr)
 		return (-TARGET_EFAULT);
 	memcpy(target_saddr, addr, len);
-	target_saddr->sa_family = tswap16(addr->sa_family);
+	target_saddr->sa_family = addr->sa_family;	/* type uint8_t */
+	target_saddr->sa_len = addr->sa_len;		/* type uint8_t */
 	unlock_user(target_saddr, target_addr, len);
 
 	return (0);
@@ -1427,7 +1429,7 @@ static abi_long
 do_sendto(int fd, abi_ulong msg, size_t len, int flags, abi_ulong target_addr,
     socklen_t addrlen)
 {
-	void *addr;
+	struct sockaddr *saddr;
 	void *host_msg;
 	abi_long ret;
 
@@ -1437,13 +1439,13 @@ do_sendto(int fd, abi_ulong msg, size_t len, int flags, abi_ulong target_addr,
 	if (!host_msg)
 		return (-TARGET_EFAULT);
 	if (target_addr) {
-		addr = alloca(addrlen);
-		ret = target_to_host_sockaddr(addr, target_addr, addrlen);
+		saddr = alloca(addrlen);
+		ret = target_to_host_sockaddr(saddr, target_addr, addrlen);
 		if (ret) {
 			unlock_user(host_msg, msg, 0);
 			return (ret);
 		}
-		ret = get_errno(sendto(fd, host_msg, len, flags, addr,
+		ret = get_errno(sendto(fd, host_msg, len, flags, saddr,
 			addrlen));
 	} else {
 		ret = get_errno(send(fd, host_msg, len, flags));
@@ -1458,7 +1460,7 @@ do_recvfrom(int fd, abi_ulong msg, size_t len, int flags, abi_ulong target_addr,
     abi_ulong target_addrlen)
 {
 	socklen_t addrlen;
-	void *addr;
+	struct sockaddr *saddr;
 	void *host_msg;
 	abi_long ret;
 
@@ -1474,16 +1476,16 @@ do_recvfrom(int fd, abi_ulong msg, size_t len, int flags, abi_ulong target_addr,
 			ret = (-TARGET_EINVAL);
 			goto fail;
 		}
-		addr = alloca(addrlen);
-		ret = get_errno(recvfrom(fd, host_msg, len, flags, addr,
+		saddr = alloca(addrlen);
+		ret = get_errno(recvfrom(fd, host_msg, len, flags, saddr,
 			&addrlen));
 	} else {
-		addr = NULL; /* To keep compiler quiet.  */
+		saddr = NULL; /* To keep compiler quiet.  */
 		ret = get_errno(qemu_recv(fd, host_msg, len, flags));
 	}
 	if (!is_error(ret)) {
 		if (target_addr) {
-			host_to_target_sockaddr(target_addr, addr, addrlen);
+			host_to_target_sockaddr(target_addr, saddr, addrlen);
 			if (put_user_u32(addrlen, target_addrlen)) {
 				ret = -TARGET_EFAULT;
 				goto fail;

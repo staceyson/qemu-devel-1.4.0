@@ -260,9 +260,10 @@ __target_cmsg_nxthdr (struct target_msghdr *__mhdr,
 }
 
 struct target_sockaddr {
-	uint16_t sa_family;
+	uint8_t sa_len;
+	uint8_t sa_family;
 	uint8_t sa_data[14];
-};
+} QEMU_PACKED;
 
 struct target_in_addr {
 	uint32_t s_addr; /* big endian */
