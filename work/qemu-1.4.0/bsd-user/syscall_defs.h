@@ -203,8 +203,8 @@ struct target_pollfd {
 #include "openbsd/syscall_nr.h"
 
 struct target_flock {
-    abi_long l_start;
-    abi_long l_len;
+    int64_t l_start;
+    int64_t l_len;
     int32_t l_pid;
     int16_t l_type;
     int16_t l_whence;
@@ -269,11 +269,20 @@ struct target_in_addr {
 	uint32_t s_addr; /* big endian */
 };
 
+/*
+ * FreeBSD/{arm, mips} uses a 64bits time_t, even in 32bits mode,
+ * so we have to add a special case here.
+ */
+#if defined(TARGET_ARM) || defined(TARGET_MIPS)
+typedef int64_t target_freebsd_time_t;
+#else
+typedef abi_long target_freebsd_time_t;
+#endif
 
 struct target_timeval {
-	abi_long tv_sec;
+	target_freebsd_time_t tv_sec;
 	abi_long tv_usec;
-};
+} QEMU_PACKED;
 
 typedef abi_long target_clock_t;
 
@@ -305,21 +314,13 @@ struct target_kevent {
     abi_ulong  udata;
 } __packed;
 
-/*
- * FreeBSD/arm uses a 64bits time_t, even in 32bits mode, so we have to
- * add a special case here.
- */
-#if defined(TARGET_ARM)
-typedef uint64_t target_freebsd_time_t;
-#else
-typedef long target_freebsd_time_t;
-#endif
 
 struct target_freebsd_timespec {
 	target_freebsd_time_t	tv_sec;		/* seconds */
 	abi_long		tv_nsec;	/* and nanoseconds */
 } __packed;
 
+/* XXX We have target_*_timeval defined twice.  */
 struct target_freebsd_timeval {
 	target_freebsd_time_t	tv_sec;
 	abi_long		tv_usec;
@@ -673,7 +674,7 @@ struct target_statfs {
 	uint64_t f_asyncreads;	/* count of async reads since mount */
 	uint64_t f_spare[10];	/* unused spare */
 	uint32_t f_namemax;	/* maximum filename length */
-	uid_t    f_owner;	/* user that mounted the filesystem */
+	uint32_t f_owner;	/* user that mounted the filesystem */
 	target_fsid_t   f_fsid;	/* filesystem id */
 	char     f_charspare[80];			/* spare string space */
 	char     f_fstypename[TARGET_MFSNAMELEN];	/* filesys type name */

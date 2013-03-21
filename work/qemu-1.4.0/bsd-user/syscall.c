@@ -5672,8 +5672,8 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 				 return (-TARGET_EFAULT);
 			 fl.l_type = tswap16(target_fl->l_type);
 			 fl.l_whence = tswap16(target_fl->l_whence);
-			 fl.l_start = tswapal(target_fl->l_start);
-			 fl.l_len = tswapal(target_fl->l_len);
+			 fl.l_start = tswap64(target_fl->l_start);
+			 fl.l_len = tswap64(target_fl->l_len);
 			 fl.l_pid = tswap32(target_fl->l_pid);
 			 fl.l_sysid = tswap32(target_fl->l_sysid);
 			 unlock_user_struct(target_fl, arg3, 0);
@@ -5684,8 +5684,8 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 					 return (-TARGET_EFAULT);
 				 target_fl->l_type = tswap16(fl.l_type);
 				 target_fl->l_whence = tswap16(fl.l_whence);
-				 target_fl->l_start = tswapal(fl.l_start);
-				 target_fl->l_len = tswapal(fl.l_len);
+				 target_fl->l_start = tswap64(fl.l_start);
+				 target_fl->l_len = tswap64(fl.l_len);
 				 target_fl->l_pid = tswap32(fl.l_pid);
 				 target_fl->l_sysid = tswap32(fl.l_sysid);
 				 unlock_user_struct(target_fl, arg3, 1);
@@ -5696,8 +5696,8 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 		 case TARGET_F_SETLKW:
 			 if (!lock_user_struct(VERIFY_READ, target_fl, arg3, 1))
 				 return (-TARGET_EFAULT);
-			 fl.l_start = tswapal(target_fl->l_start);
-			 fl.l_len = tswapal(target_fl->l_len);
+			 fl.l_start = tswap64(target_fl->l_start);
+			 fl.l_len = tswap64(target_fl->l_len);
 			 fl.l_pid = tswap32(target_fl->l_pid);
 			 fl.l_type = tswap16(target_fl->l_type);
 			 fl.l_whence = tswap16(target_fl->l_whence);
