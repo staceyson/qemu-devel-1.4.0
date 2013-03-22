@@ -346,7 +346,7 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 #endif
 
 #ifdef TARGET_ARM
-static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
+static abi_long do_freebsd_sysarch(CPUARMState *env, int op, abi_ulong parms)
 {
     int ret = 0;
 
@@ -361,7 +361,7 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 
     case TARGET_FREEBSD_ARM_GET_TP:
 	/* XXX Need a cpu_get_tls() */
-	if (put_user(env->cp15.c13_tls2, params, abi_ulong))
+	if (put_user(env->cp15.c13_tls2, parms, abi_ulong))
 		ret = -TARGET_EFAULT;
 	break;
 
