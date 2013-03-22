@@ -348,30 +348,45 @@ static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 #ifdef TARGET_ARM
 static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
 {
+    int ret = 0;
 
     switch (op) {
+    case TARGET_FREEBSD_ARM_SYNC_ICACHE:
+    case TARGET_FREEBSD_ARM_DRAIN_WRITEBUF:
+	break;
+
     case TARGET_FREEBSD_ARM_SET_TP:
         cpu_set_tls(env, parms);
-        return 0;
+	break;
+
+    case TARGET_FREEBSD_ARM_GET_TP:
+	/* XXX Need a cpu_get_tls() */
+	if (put_user(env->cp15.c13_tls2, params, abi_ulong))
+		ret = -TARGET_EFAULT;
+	break;
+
+    default:
+	ret = -TARGET_EINVAL;
+	break;
     }
 
-    return -TARGET_EINVAL;
+    return (ret);
 }
 #endif
 
 #ifdef TARGET_MIPS
-static abi_long do_freebsd_sysarch(void *env, int op, abi_ulong parms)
+static abi_long do_freebsd_sysarch(CPUMIPSState *env, int op, abi_ulong parms)
 {
 	int ret = 0;
-	CPUMIPSState *mips_env = (CPUMIPSState *)env;
 
 	switch(op) {
 	case TARGET_MIPS_SET_TLS:
-		mips_env->tls_value = parms;
+		cpu_set_tls(env, parms);
 		break;
 
 	case TARGET_MIPS_GET_TLS:
-		if (put_user(mips_env->tls_value, parms, abi_ulong))
+		/* XXX Need a cpu_get_tls() */
+		if (put_user(env->tls_value, parms, abi_ulong))
 			ret = -TARGET_EFAULT;
 		break;
 	default:
