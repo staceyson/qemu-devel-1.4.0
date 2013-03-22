@@ -35,6 +35,7 @@
 #include "tcg.h"
 #include "qemu/timer.h"
 #include "qemu/envlist.h"
+#include "target_signal.h"
 
 #if defined(CONFIG_USE_NPTL) && defined(__FreeBSD__)
 #include <sys/thr.h>
@@ -813,15 +814,25 @@ void cpu_loop(CPUARMState *env)
                                                       arg6,
                                                       arg7,
                                                       arg8);
-                    if ((unsigned int)ret >= (unsigned int)(-515)) {
-                        ret = -ret;
-                        cpsr_write(env, CPSR_C, CPSR_C);
-                        env->regs[0] = ret;
-                    } else {
-                        cpsr_write(env, 0, CPSR_C);
-                        env->regs[0] = ret; // XXX need to handle lseek()?
-                        // env->regs[1] = 0;
-                    }
+		    /* Compare to arm/arm/vm_machdep.c cpu_set_syscall_retval() */
+		    /* XXX armeb may need some extra magic here */
+		    if (-TARGET_EJUSTRETURN == ret) {
+			    /*
+			     * Returning from a successful sigreturn syscall.
+			     * Avoid clobbering register state.
+			     */
+				break;
+		    }
+		    /* XXX Need to handle ERESTART. Backup the PC by 1 instruction*/
+		    if ((unsigned int)ret >= (unsigned int)(-515)) {
+			    ret = -ret;
+			    cpsr_write(env, CPSR_C, CPSR_C);
+			    env->regs[0] = ret;
+		    } else {
+			    cpsr_write(env, 0, CPSR_C);
+			    env->regs[0] = ret; // XXX need to handle lseek()?
+			    // env->regs[1] = 0;
+		    }
                 } else {
                     // XXX is this correct?
                     env->regs[0] = do_openbsd_syscall(env,
@@ -1068,13 +1079,20 @@ void cpu_loop(CPUMIPSState *env)
 				}
 			}
 /* done_syscall: */
-			if (-TARGET_QEMU_ESIGRETURN == ret) {
+			/*
+			 * Compare to mips/mips/vm_machdep.c
+			 * cpu_set_syscall_retval()
+			 *
+			 * XXX need to handle lseek here.
+			 */
+			if (-TARGET_EJUSTRETURN == ret) {
 				/*
 				 * Returning from a successful sigreturn
 				 * syscall.  Avoid clobbering register state.
 				 */
 				break;
 			}
+			/* XXX need to handle ERESTART */
 			if ((unsigned int)ret >= (unsigned int)(-1133)) {
 				env->active_tc.gpr[7] = 1;
 				ret = -ret;

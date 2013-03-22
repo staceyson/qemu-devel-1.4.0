@@ -90,11 +90,11 @@
 
 #include "qemu.h"
 #include "qemu-common.h"
+#include "target_signal.h"
 #ifdef __FreeBSD__
 #include "freebsd/ttycom.h"
 #include "freebsd/filio.h"
 #endif
-
 
 //#define DEBUG
 

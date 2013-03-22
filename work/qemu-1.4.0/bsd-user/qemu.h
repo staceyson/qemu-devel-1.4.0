@@ -27,7 +27,6 @@ abi_long memcpy_to_target(abi_ulong dest, const void *src,
 #include "syscall_defs.h"
 #include "syscall.h"
 #include "target_vmparam.h"
-#include "target_signal.h"
 #include "exec/gdbstub.h"
 
 #if defined(CONFIG_USE_NPTL)

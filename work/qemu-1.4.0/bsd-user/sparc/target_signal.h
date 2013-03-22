@@ -43,4 +43,12 @@ set_mcontext(CPUArchState *regs, target_mcontext_t *mcp, int flags)
 	return (-TARGET_ENOSYS);
 }
 
+static inline abi_long
+get_ucontext_sigreturn(CPUArchState *regs, abi_ulong sf_addr,
+        target_ucontext_t **ucontext, void **locked_addr)
+{
+	fprintf(stderr, "SPARC doesn't have support for do_sigreturn()\n");
+	return (-TARGET_ENOSYS);
+}
+
 #endif /* TARGET_SIGNAL_H */

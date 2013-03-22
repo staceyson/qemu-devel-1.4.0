@@ -61,7 +61,7 @@ get_sp_from_cpustate(CPUMIPSState *state)
  * Compare to mips/mips/pm_machdep.c sendsig()
  * Assumes that "frame" memory is locked.
  */
-static inline int
+static inline abi_long
 set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
     abi_ulong frame_addr, struct target_sigaction *ka)
 {
@@ -98,7 +98,7 @@ set_sigtramp_args(CPUMIPSState *regs, int sig, struct target_sigframe *frame,
  * Compare to mips/mips/pm_machdep.c get_mcontext()
  * Assumes that the memory is locked if mcp points to user memory.
  */
-static inline int
+static inline abi_long
 get_mcontext(CPUMIPSState *regs, target_mcontext_t *mcp, int flags)
 {
 	int i, err = 0;
@@ -152,8 +152,8 @@ get_mcontext(CPUMIPSState *regs, target_mcontext_t *mcp, int flags)
 }
 
 /* Compare to mips/mips/pm_machdep.c set_mcontext() */
-static inline int
-set_mcontext(CPUMIPSState *regs, target_mcontext_t *mcp, int flags)
+static inline abi_long
+set_mcontext(CPUMIPSState *regs, target_mcontext_t *mcp, int srflag)
 {
 	int i, err = 0;
 
@@ -184,9 +184,27 @@ set_mcontext(CPUMIPSState *regs, target_mcontext_t *mcp, int flags)
 	regs->active_tc.HI[0] = tswapal(mcp->mulhi);
 	regs->tls_value = tswapal(mcp->mc_tls);
 
+	if (srflag) {
+		/* doing sigreturn() */
+		regs->active_tc.PC = regs->CP0_EPC;
+		regs->CP0_EPC = 0;  /* XXX  for nested signals ? */
+	}
+
 	/* Don't do any of the status and cause registers. */
 
 	return (err);
+}
+
+/*  mips/mips/pm_machdep.c sys_sigreturn() */
+static inline abi_long
+get_ucontext_sigreturn(CPUMIPSState *regs, abi_ulong uc_addr,
+    target_ucontext_t **ucontext, void **locked_addr)
+{
+	if (!lock_user_struct(VERIFY_READ, *ucontext, uc_addr, 0))
+		return (-TARGET_EFAULT);
+
+	*locked_addr = *ucontext;
+	return (0);
 }
 
 #endif /* TARGET_SIGNAL_H */

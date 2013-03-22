@@ -101,6 +101,9 @@ static struct target_sigaction sigact_table[TARGET_NSIG];
 
 static void host_signal_handler(int host_signum, siginfo_t *info, void *puc);
 
+static void target_to_host_sigset_internal(sigset_t *d, const target_sigset_t *s);
+void QEMU_NORETURN force_sig(int target_sig);
+
 static inline int
 on_sig_stack(unsigned long sp)
 {
@@ -315,7 +318,7 @@ free_sigqueue(CPUArchState *env, struct qemu_sigqueue *q)
 }
 
 /* Abort execution with signal. */
-static void QEMU_NORETURN
+void QEMU_NORETURN
 force_sig(int target_sig)
 {
 	TaskState *ts = (TaskState *)thread_env->opaque;
@@ -728,194 +731,20 @@ give_sigsegv:
 	force_sig(TARGET_SIGSEGV);
 }
 
-long
-do_sigreturn(CPUArchState *regs, abi_ulong uc_addr)
+#else
+
+static void
+setup_frame(int sig, int code, struct target_sigaction *ka, target_sigset_t *set,
+    target_siginfo_t *tinfo, CPUArchState *env)
 {
-	target_ucontext_t *ucontext;
-	sigset_t blocked;
-	target_sigset_t target_set;
-	int i;
 
-#if defined(DEBUG_SIGNAL)
-	fprintf(stderr, "do_sigreturn\n");
-#endif
-	if (!lock_user_struct(VERIFY_READ, ucontext, uc_addr, 1))
-		goto badframe;
-
-	for(i = 0; i < TARGET_NSIG_WORDS; i++) {
-		if (__get_user(target_set.__bits[i], &ucontext->uc_sigmask.__bits[i]))
-			goto badframe;
-	}
-
-	if (set_mcontext(regs, &ucontext->uc_mcontext, 0))
-		goto badframe;
-
-	target_to_host_sigset_internal(&blocked, &target_set);
-	sigprocmask(SIG_SETMASK, &blocked, NULL);
-
-#if defined(TARGET_MIPS)
-	CPUMIPSState *mips_regs = (CPUMIPSState *)regs;
-	mips_regs->active_tc.PC = mips_regs->CP0_EPC;
-	mips_regs->CP0_EPC = 0;  /* XXX  for nested signals ? */
-#endif
-	return (-TARGET_QEMU_ESIGRETURN);
-
-badframe:
-	force_sig(TARGET_SIGSEGV);
-	return (0);
+	fprintf(stderr, "setup_frame: not implemented\n");
 }
 
+#endif /* ! TARGET_ARM && TARGET_MIPS */
 
 
-/* #elif defined(TARGET_SPARC64) */
 #if 0
-
-#define	mc_flags	mc_global[0]
-#define	mc_sp		mc_out[6]
-#define	mc_fprs		mc_local[0]
-#define	mc_fsr		mc_local[1]
-#define	mc_qsr		mc_local[2]
-#define	mc_tnpc		mc_in[0]
-#define	mc_tpc		mc_in[1]
-#define	mc_tstate	mc_in[2]
-#define	mc_y		mc_in[4]
-#define	mc_wstate	mc_in[5]
-
-#define	ureg_i0		regwptr[0 ]
-#define	ureg_i1		regwptr[1 ]
-#define	ureg_i2		regwptr[2 ]
-#define	ureg_i3		regwptr[3 ]
-#define	ureg_i4		regwptr[4 ]
-#define	ureg_i5		regwptr[5 ]
-#define	ureg_i6		regwptr[6 ]
-#define	ureg_i7		regwptr[7 ]
-#define	ureg_l0		regwptr[8 ]
-#define	ureg_l1		regwptr[9 ]
-#define	ureg_l2		regwptr[10]
-#define	ureg_l3		regwptr[11]
-#define	ureg_l4		regwptr[12]
-#define	ureg_l5		regwptr[13]
-#define	ureg_l6		regwptr[14]
-#define	ureg_l7		regwptr[15]
-#define	ureg_o0		regwptr[16]
-#define	ureg_o1		regwptr[17]
-#define	ureg_o2		regwptr[18]
-#define	ureg_o3		regwptr[19]
-#define	ureg_o4		regwptr[20]
-#define	ureg_o5		regwptr[21]
-#define	ureg_o6		regwptr[22]
-#define	ureg_o7		regwptr[23]
-#define	ureg_fp		ureg_i6
-#define	ureg_sp		ureg_o6
-#define	ureg_tnpc	ureg_i0
-#define	ureg_tpc	ureg_i1
-
-#define	TARGET_FPRS_FEF	(1 << 2)
-#define	TARGET_MC_VERSION 1L
-
-/* compare to sparc64/sparc64/machdep.c set_mcontext() */
-static inline int
-restore_sigmcontext(CPUSPARCState *regs, target_mcontext_t *mc)
-{
-	int err = 0;
-
-	err |= __get_user(regs->gregs[1], &mc->mc_global[1]);
-	err |= __get_user(regs->gregs[2], &mc->mc_global[2]);
-	err |= __get_user(regs->gregs[3], &mc->mc_global[3]);
-	err |= __get_user(regs->gregs[4], &mc->mc_global[4]);
-	err |= __get_user(regs->gregs[5], &mc->mc_global[5]);
-	err |= __get_user(regs->gregs[6], &mc->mc_global[6]);
-
-	err |= __get_user(regs->ureg_o0, &mc->mc_out[0]);
-	err |= __get_user(regs->ureg_o1, &mc->mc_out[1]);
-	err |= __get_user(regs->ureg_o2, &mc->mc_out[2]);
-	err |= __get_user(regs->ureg_o3, &mc->mc_out[3]);
-	err |= __get_user(regs->ureg_o4, &mc->mc_out[4]);
-	err |= __get_user(regs->ureg_o5, &mc->mc_out[5]);
-	err |= __get_user(regs->ureg_o6, &mc->mc_out[6]);
-	err |= __get_user(regs->ureg_o7, &mc->mc_out[0]);
-
-	err |= __get_user(regs->ureg_l0, &mc->mc_fprs);  /* mc_local[0] */
-	err |= __get_user(regs->ureg_l1, &mc->mc_fsr);   /* mc_local[1] */
-	err |= __get_user(regs->ureg_l2, &mc->mc_qsr);   /* mc_local[2] */
-
-	err |= __get_user(regs->ureg_i0, &mc->mc_tnpc);  /* mc_in[0] */
-	err |= __get_user(regs->ureg_i1, &mc->mc_tpc);	 /* mc_in[1] */
-	err |= __get_user(regs->ureg_i2, &mc->mc_tstate);/* mc_in[2] */
-
-	err |= __get_user(regs->ureg_i4, &mc->mc_y);	 /* mc_in[4] */
-
-	/* XXX
-	if ((regs->ureg_l0 & TARGET_FPRS_FEF) != 0) {
-		regs->ureg_l0 = 0;
-		for(i = 0; i < 64; i++)
-			err |= __get_user(regs->fpr[i], &mc->mc_fp[i]);
-	}
-	*/
-
-	return (err);
-}
-
-/* compare to sparc64/sparc64/machdep.c get_mcontext() */
-static inline int
-setup_sigmcontext(CPUSPARCState *regs, target_mcontext_t *mc)
-{
-	int err = 0;
-	abi_ulong ver = TARGET_MC_VERSION;
-
-	err |= __put_user(ver, &mc->mc_flags); /* aka. mc_global[0] */
-	err |= __put_user(regs->gregs[1], &mc->mc_global[1]);
-	err |= __put_user(regs->gregs[2], &mc->mc_global[2]);
-	err |= __put_user(regs->gregs[3], &mc->mc_global[3]);
-	err |= __put_user(regs->gregs[4], &mc->mc_global[4]);
-	err |= __put_user(regs->gregs[5], &mc->mc_global[5]);
-	err |= __put_user(regs->gregs[6], &mc->mc_global[6]);
-	/* skip %g7 since it is used as the userland TLS register */
-
-	err |= __put_user(regs->ureg_o0, &mc->mc_out[0]);
-	err |= __put_user(regs->ureg_o1, &mc->mc_out[1]);
-	err |= __put_user(regs->ureg_o2, &mc->mc_out[2]);
-	err |= __put_user(regs->ureg_o3, &mc->mc_out[3]);
-	err |= __put_user(regs->ureg_o4, &mc->mc_out[4]);
-	err |= __put_user(regs->ureg_o5, &mc->mc_out[5]);
-	err |= __put_user(regs->ureg_o6, &mc->mc_out[6]);
-	err |= __put_user(regs->ureg_o7, &mc->mc_out[7]);
-
-	err |= __put_user(regs->ureg_l0, &mc->mc_fprs);  /* mc_local[0] */
-	err |= __put_user(regs->ureg_l1, &mc->mc_fsr);   /* mc_local[1] */
-	err |= __put_user(regs->ureg_l2, &mc->mc_qsr);   /* mc_local[2] */
-
-	err |= __put_user(regs->ureg_i0, &mc->mc_tnpc);  /* mc_in[0] */
-	err |= __put_user(regs->ureg_i1, &mc->mc_tpc);	 /* mc_in[1] */
-	err |= __put_user(regs->ureg_i2, &mc->mc_tstate);/* mc_in[2] */
-
-	err |= __put_user(regs->ureg_i4, &mc->mc_y);	 /* mc_in[4] */
-
-	/* XXX
-	if ((regs->ureg_l0 & TARGET_FPRS_FEF) != 0) {
-		for(i = 0; i < 64; i++)
-			err |= __put_user(regs->fpr[i], &mc->mc_fp[i]);
-	}
-	*/
-
-	return (err);
-}
-
-static inline abi_ulong
-get_sigframe(struct target_sigaction *ka, CPUSPARCState *regs, size_t frame_size)
-{
-	abi_ulong sp;
-
-	/* Use default user stack */
-	sp = regs->ureg_sp;
-
-	if ((ka->sa_flags & TARGET_SA_ONSTACK) && (sas_ss_flags(sp) == 0)) {
-		sp = target_sigaltstack_used.ss_sp + target_sigaltstack_used.ss_size;
-	}
-
-	return (sp - frame_size);
-}
-
 /* compare to sparc64/sparc64/machdep.c sendsig() */
 static void setup_frame(int sig, int code, struct target_sigaction *ka,
     target_sigset_t *set, target_siginfo_t *tinfo, CPUSPARCState *regs)
@@ -974,63 +803,59 @@ give_sigsegv:
 	unlock_user_struct(frame, frame_addr, 1);
 	force_sig(TARGET_SIGSEGV);
 }
+#endif
 
-
-long do_sigreturn(CPUSPARCState *regs, abi_ulong uc_addr)
+static int
+reset_signal_mask(target_ucontext_t *ucontext)
 {
-	target_ucontext_t *ucontext;
+	int i;
 	sigset_t blocked;
 	target_sigset_t target_set;
-	int i;
 
-#if defined(DEBUG_SIGNAL)
-	fprintf(stderr, "do_sigreturn\n");
-#endif
-	if (!lock_user_struct(VERIFY_READ, ucontext, uc_addr, 1))
-		goto badframe;
-
-	for(i = 0; i < TARGET_NSIG_WORDS; i++) {
-		if (__get_user(target_set.__bits[i], &ucontext->uc_sigmask.__bits[i]))
-			goto badframe;
-	}
-
-	if (restore_sigmcontext(regs, &ucontext->uc_mcontext))
-		goto badframe;
-
+	for(i = 0; i < TARGET_NSIG_WORDS; i++)
+		if (__get_user(target_set.__bits[i],
+			&ucontext->uc_sigmask.__bits[i])) {
+			return (-TARGET_EFAULT);
+		}
 	target_to_host_sigset_internal(&blocked, &target_set);
 	sigprocmask(SIG_SETMASK, &blocked, NULL);
 
-	return (-TARGET_QEMU_ESIGRETURN);
-
-badframe:
-	force_sig(TARGET_SIGSEGV);
 	return (0);
 }
-#endif
-
-#else
-
-static void
-setup_frame(int sig, int code, struct target_sigaction *ka, target_sigset_t *set,
-    target_siginfo_t *tinfo, CPUArchState *env)
-{
-	fprintf(stderr, "setup_frame: not implemented\n");
-}
 
 long
-do_sigreturn(CPUArchState *env, abi_ulong uc_addr)
+do_sigreturn(CPUArchState *regs, abi_ulong addr)
 {
-	fprintf(stderr,"do_sigreturn: not implemented\n");
-	return (-TARGET_ENOSYS);
-}
+	int ret;
+	target_ucontext_t *ucontext;
+	void *locked_addr = NULL;
 
-long
-do_rt_sigreturn(CPUArchState *env)
-{
-	fprintf(stderr, "do_rt_sigreturn: not implemented\n");
-	return (-TARGET_ENOSYS);
+	/* Lock the memory and get the ucontext ptr from the stack frame */
+	ret = get_ucontext_sigreturn(regs, addr, &ucontext, &locked_addr);
+	if (ret) {
+		if (-TARGET_EFAULT == ret)
+			goto badframe;
+		else
+			return (ret);
+	}
+
+	/* Set the register state back to before the signal. */
+	if (set_mcontext(regs, &ucontext->uc_mcontext, 1))
+		goto badframe;
+
+	/* And reset the signal mask. */
+	if (reset_signal_mask(ucontext))
+		goto badframe;
+
+	unlock_user_struct(locked_addr, addr, 0);
+	return (-TARGET_EJUSTRETURN);
+
+badframe:
+	if (locked_addr != NULL)
+		unlock_user_struct(locked_addr, addr, 0);
+	force_sig(TARGET_SIGSEGV);
+	return (-TARGET_EFAULT);
 }
-#endif
 
 void
 signal_init(void)

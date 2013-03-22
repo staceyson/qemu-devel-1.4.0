@@ -3,11 +3,6 @@
 
 #include "cpu.h"
 
-static inline abi_ulong get_sp_from_cpustate(CPUX86State *state)
-{
-    return state->regs[R_ESP];
-}
-
 #define	TARGET_MINSIGSTKSZ	(512 * 4)
 #define	TARGET_SIGSTKSZ		(TARGET_MINSIGSTKSZ + 32768)
 
@@ -22,17 +17,31 @@ typedef struct target_ucontext {
 	int32_t			__spare__[4];
 } target_ucontext_t;
 
-static inline int
+static inline abi_ulong
+get_sp_from_cpustate(CPUX86State *state)
+{
+    return state->regs[R_ESP];
+}
+
+static inline abi_long
 get_mcontext(CPUArchState *regs, target_mcontext_t *mcp, int flags)
 {
 	fprintf(stderr, "i386 doesn't have support for get_mcontext()\n");
 	return (-TARGET_ENOSYS);
 }
 
-static inline int
+static inline abi_long
 set_mcontext(CPUArchState *regs, target_mcontext_t *mcp, int flags)
 {
 	fprintf(stderr, "i386 doesn't have support for set_mcontext()\n");
+	return (-TARGET_ENOSYS);
+}
+
+static inline abi_long
+get_ucontext_sigreturn(CPUArchState *regs, abi_ulong sf_addr,
+        target_ucontext_t **ucontext, void **locked_addr)
+{
+	fprintf(stderr, "i386 doesn't have support for do_sigreturn()\n");
 	return (-TARGET_ENOSYS);
 }
 

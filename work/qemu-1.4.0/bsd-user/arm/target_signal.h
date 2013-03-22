@@ -107,7 +107,7 @@ get_sp_from_cpustate(CPUARMState *state)
  * Compare to arm/arm/machdep.c sendsig()
  * Assumes that the target stack frame memory is locked.
  */
-static inline int
+static inline abi_ulong
 set_sigtramp_args(CPUARMState *regs, int sig, struct target_sigframe *frame,
     abi_ulong frame_addr, struct target_sigaction *ka)
 {
@@ -139,7 +139,7 @@ set_sigtramp_args(CPUARMState *regs, int sig, struct target_sigframe *frame,
 }
 
 /* Compare to arm/arm/machdep.c get_mcontext() */
-static inline int
+static inline abi_long
 get_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int clear_ret)
 {
 	int err = 0;
@@ -173,8 +173,8 @@ get_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int clear_ret)
 }
 
 /* Compare to arm/arm/machdep.c set_mcontext() */
-static inline int
-set_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int flags)
+static inline abi_long
+set_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int srflag)
 {
 	int err = 0;
 	const uint32_t *gr = mcp->__gregs;
@@ -201,6 +201,27 @@ set_mcontext(CPUARMState *regs, target_mcontext_t *mcp, int flags)
 	cpsr_write(regs, cpsr, CPSR_USER | CPSR_EXEC);
 
 	return (err);
+}
+
+/* Compare to arm/arm/machdep.c sys_sigreturn() */
+static inline abi_long
+get_ucontext_sigreturn(CPUARMState *regs, abi_ulong sf_addr,
+    target_ucontext_t **ucontext, void **locked_addr)
+{
+	struct target_sigframe *sf;
+	uint32_t cpsr = cpsr_read(regs);
+
+	if ((cpsr & CPSR_M) != ARM_CPU_MODE_USR ||
+	    (cpsr & (CPSR_I | CPSR_F)) != 0)
+		return (-TARGET_EINVAL);
+
+	if (!lock_user_struct(VERIFY_READ, sf, sf_addr, 0))
+		return (-TARGET_EFAULT);
+
+	*locked_addr = sf;
+	*ucontext = (target_ucontext_t *)g2h(tswapal(sf_addr +
+		offsetof(struct target_sigframe, sf_uc)));
+	return (0);
 }
 
 #endif /* TARGET_SIGNAL_H */

@@ -13,6 +13,7 @@
 
 #include "qemu.h"
 #include "disas/disas.h"
+#include "target_signal.h"
 
 #ifdef _ARCH_PPC64
 #undef ARCH_DLINFO

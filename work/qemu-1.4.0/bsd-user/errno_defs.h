@@ -147,3 +147,7 @@
 #define TARGET_EIDRM            89              /* Identifier removed */
 #define TARGET_ENOMSG           90              /* No message of desired type */
 #define TARGET_ELAST            90              /* Must be equal largest errno */
+
+/* pseudo-errors just used in the kernel/emulator: */
+#define	TARGET_ERESTART		255		/* restart syscall */
+#define	TARGET_EJUSTRETURN	254		/* Don't modify regs, just ret */
