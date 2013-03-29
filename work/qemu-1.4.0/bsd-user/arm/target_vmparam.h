@@ -1,6 +1,9 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
+#define	TARGET_HW_MACHINE	"arm"
+#define	TARGET_HW_MACHINE_ARCH	"armv6"
+
 #if defined(__FreeBSD__)
 					/* KERNBASE - 512 MB */
 #define TARGET_VM_MAXUSER_ADDRESS	(0xc0000000 - (512 * 1024 * 1024))

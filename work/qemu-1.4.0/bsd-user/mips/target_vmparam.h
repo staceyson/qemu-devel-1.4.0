@@ -1,6 +1,9 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
+#define	TARGET_HW_MACHINE	"mips"
+#define	TARGET_HW_MACHINE_ARCH	"mips"
+
 #if defined(__FreeBSD__)
 #define	TARGET_VM_MINUSER_ADDRESS	(0x00000000)
 #define	TARGET_VM_MAXUSER_ADDRESS	(0x80000000)

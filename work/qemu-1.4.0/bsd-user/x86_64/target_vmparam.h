@@ -1,6 +1,9 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
+#define	TARGET_HW_MACHINE	"amd64"
+#define	TARGET_HW_MACHINE_ARCH	"amd64"
+
 #if defined(__FreeBSD__)
 #define	TARGET_VM_MAXUSER_ADDRESS	(0x0000800000000000UL)
 

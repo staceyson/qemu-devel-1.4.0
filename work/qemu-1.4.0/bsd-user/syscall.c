@@ -568,6 +568,22 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
 	    }
             break;
 
+    case CTL_HW:
+	    switch(snamep[1]) {
+	    case HW_MACHINE:
+		strlcpy(holdp, TARGET_HW_MACHINE, oldlen);
+		ret = 0;
+		goto out;
+
+	    case HW_MACHINE_ARCH:
+		strlcpy(holdp, TARGET_HW_MACHINE_ARCH, oldlen);
+		ret = 0;
+		goto out;
+
+	    default:
+		break;
+	    }
+
     default:
 	    break;
     }

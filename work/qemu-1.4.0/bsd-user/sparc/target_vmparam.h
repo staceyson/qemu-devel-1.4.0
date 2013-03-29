@@ -1,6 +1,9 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
+#define	TARGET_HW_MACHINE	"sparc"
+#define	TARGET_HW_MACHINE_ARCH	"sparc"
+
 #ifdef __FreeBSD__
 struct target_ps_strings {
         abi_ulong ps_argvstr;

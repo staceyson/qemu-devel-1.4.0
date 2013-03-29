@@ -1,6 +1,9 @@
 #ifndef _TARGET_VMPARAM_H_
 #define _TARGET_VMPARAM_H_
 
+#define	TARGET_HW_MACHINE	"i386"
+#define	TARGET_HW_MACHINE_ARCH	"i386"
+
 #if defined(__FreeBSD__)
 
 #define	TARGET_USRSTACK	(0xbfc00000)
