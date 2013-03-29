@@ -2680,6 +2680,7 @@ do_thr_new(CPUArchState *env, abi_ulong target_param_addr, int32_t param_size)
 	info.param.tls_size = tswapal(target_param->tls_size);
 	info.param.child_tid = tswapal(target_param->child_tid);
 	info.param.parent_tid = tswapal(target_param->parent_tid);
+	info.param.flags = tswap32(target_param->flags);
 	target_rtp_addr = info.param.rtp = tswapal(target_param->rtp);
 	unlock_user(target_param, target_param_addr, 0);
 
