@@ -207,4 +207,18 @@ get_ucontext_sigreturn(CPUMIPSState *regs, abi_ulong uc_addr,
 	return (0);
 }
 
+/* Compare to mips/mips/vm_machdep.c cpu_set_upcall_kse() */
+static inline void
+thread_set_upcall(CPUMIPSState *regs, abi_ulong entry,
+    abi_ulong arg, abi_ulong stack_base)
+{
+
+	/* t9 = pc = start_func entry */
+	regs->active_tc.gpr[25] = regs->active_tc.PC = entry;
+	/* a0 = arg */
+	regs->active_tc.gpr[ 4] = arg;
+	/* sp = stack base */
+	regs->active_tc.gpr[29] = stack_base;
+}
+
 #endif /* TARGET_SIGNAL_H */

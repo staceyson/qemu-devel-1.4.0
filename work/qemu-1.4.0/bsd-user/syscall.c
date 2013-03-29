@@ -2582,13 +2582,11 @@ new_thread_start(void *arg)
 	if (info->param.parent_tid)
 		put_user(tid, info->param.parent_tid, abi_long);
 
-#ifdef TARGET_MIPS64
-	CPUMIPSState *regs = env;
-	regs->active_tc.gpr[25] = regs->active_tc.PC = info->param.start_func;
-	regs->active_tc.gpr[ 4] = info->param.arg;
-	regs->active_tc.gpr[29] = info->param.stack_base;
-#endif
-	/* Eenable signals */
+	/* Set arch dependent registers to start thread. */
+	thread_set_upcall(env, info->param.start_func, info->param.arg,
+	    info->param.stack_base);
+
+	/* Enable signals */
 	sigprocmask(SIG_SETMASK, &info->sigmask, NULL);
 	/* Signal to the parent that we're ready. */
 	pthread_mutex_lock(&info->mutex);
@@ -2691,9 +2689,8 @@ do_thr_new(CPUArchState *env, abi_ulong target_param_addr, int32_t param_size)
 	ts->bprm = parent_ts->bprm;
 	ts->info = parent_ts->info;
 
-#if defined(TARGET_MIPS)
-	env->tls_value = info.param.tls_base;
-	/* cpu_set_tls(new_env, info.param.tls_base); */
+#if defined(TARGET_MIPS) || defined(TARGET_ARM)
+	cpu_set_tls(env, info.param.tls_base);
 #endif
 
 	/* Grab a mutex so that thread setup appears atomic. */

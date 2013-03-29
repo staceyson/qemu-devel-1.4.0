@@ -224,4 +224,19 @@ get_ucontext_sigreturn(CPUARMState *regs, abi_ulong sf_addr,
 	return (0);
 }
 
+/* Compare to arm/arm/vm_machdep.c cpu_set_upcall_kse() */
+/* XXX crashes on first shared lib call */
+static inline void
+thread_set_upcall(CPUARMState *regs, abi_ulong entry, abi_ulong arg,
+    abi_ulong stack_base)
+{
+
+	/* fp = sp = stack base */
+	regs->regs[11] = regs->regs[13] = stack_base;
+	/* pc = start function entry */
+	regs->regs[15] = regs->regs[14] = entry & 0xfffffffe;
+	/* r0 = arg */
+	regs->regs[0] = arg;
+}
+
 #endif /* TARGET_SIGNAL_H */

@@ -631,7 +631,7 @@ get_sigframe(struct target_sigaction *ka, CPUArchState *regs, size_t frame_size)
 		    target_sigaltstack_used.ss_size;
 	}
 
-#if defined(TARGET_MIPS)
+#if defined(TARGET_MIPS) || defined(TARGET_ARM)
 	return ((sp - frame_size) & ~7);
 #else
 	return (sp - frame_size);

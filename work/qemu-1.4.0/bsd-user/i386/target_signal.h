@@ -45,4 +45,12 @@ get_ucontext_sigreturn(CPUArchState *regs, abi_ulong sf_addr,
 	return (-TARGET_ENOSYS);
 }
 
+/* Compare to arm/arm/vm_machdep.c cpu_set_upcall_kse() */
+static inline void
+thread_set_upcall(CPUArchState *regs, abi_ulong entry, abi_ulong arg,
+        abi_ulong stack_base)
+{
+	fprintf(stderr, "i386 doesn't have support for thread_set_upcall()\n");
+}
+
 #endif /* TARGET_SIGNAL_H */
