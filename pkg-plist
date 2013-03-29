@@ -28,11 +28,11 @@ bin/qemu-system-i386
 %%BSD_USER%%bin/qemu-armeb
 %%BSD_USER%%bin/qemu-i386
 %%BSD_USER%%bin/qemu-mips
-%%BSD_USER%%bin/qemu-mips64
+%%BSD_USER64%%bin/qemu-mips64
 %%BSD_USER%%bin/qemu-mipsel
 %%BSD_USER%%bin/qemu-sparc
-%%BSD_USER%%bin/qemu-sparc64
-%%BSD_USER%%bin/qemu-x86_64
+%%BSD_USER64%%bin/qemu-sparc64
+%%BSD_USER64%%bin/qemu-x86_64
 bin/qemu-system-x86_64
 %%NONX86%%bin/qemu-system-xtensa
 %%NONX86%%bin/qemu-system-xtensaeb

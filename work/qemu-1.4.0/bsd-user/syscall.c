@@ -123,6 +123,7 @@ get_filename_from_fd(pid_t pid, int fd, char *filename, size_t len)
 	struct filestat *fst;
 	char *ret = NULL;
 
+#if defined(__FreeBSD_version) && __FreeBSD_version > 900000
 	procstat = procstat_open_sysctl();
 	if (NULL == procstat)
 		goto out;
@@ -152,6 +153,7 @@ out:
 		procstat_freeprocs(procstat, kipp);
 	if (procstat != NULL)
 		procstat_close(procstat);
+#endif
 	return (ret);
 }
 
@@ -1752,7 +1754,9 @@ int_case:
 		case IP_RECVDSTADDR:
 
 		case IP_RETOPTS:
+#if defined(__FreeBSD_version) && __FreeBSD_version > 900000
 		case IP_RECVTOS:
+#endif
 		case IP_MULTICAST_TTL:
 		case IP_MULTICAST_LOOP:
 		case IP_PORTRANGE:

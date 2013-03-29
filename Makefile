@@ -30,7 +30,8 @@ CONFLICTS_INSTALL=	qemu-[0-9]*
 MAKE_JOBS_SAFE=	yes
 
 OPTIONS_DEFINE=	SAMBA SDL OPENGL GNUTLS SASL JPEG PNG CURL CDROM_DMA PCAP \
-		USBREDIR GNS3 ADD_AUDIO CLANG_HACK X86_TARGETS BSD_USER STATIC_LINK
+		USBREDIR GNS3 ADD_AUDIO CLANG_HACK X86_TARGETS BSD_USER \
+		STATIC_LINK
 SAMBA_DESC=		samba dependency (for -smb)
 GNUTLS_DESC=		gnutls dependency (vnc encryption)
 SASL_DESC=		cyrus-sasl dependency (vnc encryption)
@@ -47,7 +48,7 @@ CLANG_HACK_DESC=		clang workaround (result slow and less stable!)
 X86_TARGETS_DESC=	Don't build non-x86 system targets
 BSD_USER_DESC=		Also build bsd-user targets (for testing)
 STATIC_LINK_DESC=	Statically link the executables
-OPTIONS_DEFAULT=SDL OPENGL GNUTLS SASL JPEG PNG CURL CDROM_DMA
+OPTIONS_DEFAULT=SDL OPENGL GNUTLS SASL JPEG PNG CURL CDROM_DMA PCAP
 
 .include <bsd.port.options.mk>
 
@@ -66,7 +67,11 @@ USE_GCC=	any
 
 .if ${PORT_OPTIONS:MX86_TARGETS}
 .if ${PORT_OPTIONS:MBSD_USER}
+.if ${ARCH} != "amd64"
+CONFIGURE_ARGS+=	--enable-nptl --target-list=i386-softmmu,x86_64-softmmu,i386-bsd-user,sparc-bsd-user,arm-bsd-user,armeb-bsd-user,mips-bsd-user,mipsel-bsd-user
+.else
 CONFIGURE_ARGS+=	--enable-nptl --target-list=i386-softmmu,x86_64-softmmu,i386-bsd-user,x86_64-bsd-user,sparc-bsd-user,sparc64-bsd-user,arm-bsd-user,armeb-bsd-user,mips-bsd-user,mipsel-bsd-user,mips64-bsd-user
+.endif
 .else
 CONFIGURE_ARGS+=	--target-list=i386-softmmu,x86_64-softmmu
 .endif
@@ -75,6 +80,9 @@ CONFIGURE_ARGS+=	--target-list=i386-softmmu,x86_64-softmmu
 CONFIGURE_ARGS+=	--disable-bsd-user
 .else
 CONFIGURE_ARGS+=	--enable-nptl
+.if ${ARCH} != "amd64"
+CONFIGURE_ARGS+=	--target-list=i386-softmmu,x86_64-softmmu,alpha-softmmu,arm-softmmu,cris-softmmu,lm32-softmmu,m68k-softmmu,microblaze-softmmu,microblazeel-softmmu,mips-softmmu,mipsel-softmmu,mips64-softmmu,mips64el-softmmu,or32-softmmu,ppc-softmmu,ppcemb-softmmu,ppc64-softmmu,sh4-softmmu,sh4eb-softmmu,sparc-softmmu,sparc64-softmmu,s390x-softmmu,xtensa-softmmu,xtensaeb-softmmu,unicore32-softmmu,i386-bsd-user,sparc-bsd-user,arm-bsd-user,armeb-bsd-user,mips-bsd-user,mipsel-bsd-user
+.endif
 .endif
 .endif
 
@@ -85,6 +93,11 @@ PLIST_SUB+=	BSD_USER=""
 .if ${ARCH} == "sparc64"
 IGNORE=		bsd-user targets not tested on sparc64
 .endif
+.endif
+.if empty(PORT_OPTIONS:MBSD_USER) || ${ARCH} != "amd64"
+PLIST_SUB+=	BSD_USER64="@comment "
+.else
+PLIST_SUB+=	BSD_USER64=""
 .endif
 
 .if ${PORT_OPTIONS:MX86_TARGETS}
@@ -205,9 +218,11 @@ MAKE_ENV+=	COMPILER_PATH=${LOCALBASE}/bin
 .endif
 
 post-patch:
+.if ${OSVERSION} < 900000
+	@${REINPLACE_CMD} -e '/LIBS/s|-lprocstat||' ${WRKSRC}/configure
+.endif
 .if ${PORT_OPTIONS:MPCAP}
 	@cd ${WRKSRC} && ${PATCH} --quiet < ${FILESDIR}/pcap-patch
-	@${REINPLACE_CMD} -f ${FILESDIR}/pcap-client-type.sed ${WRKSRC}/net.h
 .endif
 .if empty(PORT_OPTIONS:MCDROM_DMA)
 	@cd ${WRKSRC} && ${PATCH} --quiet < ${FILESDIR}/cdrom-dma-patch
