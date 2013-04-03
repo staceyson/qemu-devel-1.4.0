@@ -544,6 +544,7 @@ struct target_thr_param {
 	abi_ulong	tls_size;	/* tls size. */
 	abi_ulong	child_tid;	/* address to store new TID. */
 	abi_ulong	parent_tid;	/* parent access the new TID here. */
+	abi_ulong	flags;		/* thread flags */
 	abi_ulong	rtp;		/* Real-time scheduling priority. */
 	abi_ulong	spare[3];	/* spares. */
 };

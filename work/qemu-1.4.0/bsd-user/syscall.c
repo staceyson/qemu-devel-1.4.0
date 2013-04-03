@@ -522,11 +522,7 @@ static abi_long do_freebsd_sysctl(abi_ulong namep, int32_t namelen, abi_ulong ol
     case CTL_KERN:
 	    switch(snamep[1]) {
 	    case KERN_USRSTACK:
-#if defined(TARGET_ARM) && HOST_LONG_BITS == 64 && TARGET_ABI_BITS == 32
-		    (*(uint32_t *)holdp) = 0xfffff000U;
-		    holdlen = sizeof(uint32_t);
-		    ret = 0;
-#elif TARGET_USRSTACK != 0
+#if TARGET_USRSTACK != 0
 		    (*(abi_ulong *)holdp) = tswapal(TARGET_USRSTACK);
 		    holdlen = sizeof(abi_ulong);
 		    ret = 0;
