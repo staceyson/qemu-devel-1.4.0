@@ -147,7 +147,7 @@ int load_flt_binary(struct bsd_binprm * bprm, struct target_pt_regs * regs,
                     struct image_info * info);
 int is_target_elf_binary(int fd);
 
-void target_set_brk(abi_ulong new_brk);
+void target_set_brk(abi_ulong start_brk, abi_ulong cur_brk, abi_ulong end_brk);
 abi_long do_brk(abi_ulong new_brk);
 void syscall_init(void);
 abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,

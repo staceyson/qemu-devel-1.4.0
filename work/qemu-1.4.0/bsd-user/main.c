@@ -1794,7 +1794,7 @@ int main(int argc, char **argv)
         qemu_log("entry       0x" TARGET_ABI_FMT_lx "\n", info->entry);
     }
 
-    target_set_brk(info->brk);
+    target_set_brk(info->start_data, info->brk, info->end_data);
     syscall_init();
     signal_init();
 

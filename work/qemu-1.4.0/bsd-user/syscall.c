@@ -98,8 +98,7 @@
 
 //#define DEBUG
 
-static abi_ulong target_brk;
-static abi_ulong target_original_brk;
+static abi_ulong target_brk_start, target_brk_cur, target_brk_end;
 
 static char *get_filename_from_fd(pid_t pid, int fd, char *filename, size_t len);
 
@@ -190,41 +189,43 @@ static inline int is_error(abi_long ret)
     return (abi_ulong)ret >= (abi_ulong)(-4096);
 }
 
-void target_set_brk(abi_ulong new_brk)
+void target_set_brk(abi_ulong start_brk, abi_ulong cur_brk, abi_ulong end_brk)
 {
-    target_original_brk = target_brk = HOST_PAGE_ALIGN(new_brk);
+    target_brk_start = HOST_PAGE_ALIGN(start_brk);
+    target_brk_cur = cur_brk;
+    target_brk_end = HOST_PAGE_ALIGN(end_brk);
 }
 
 /* do_obreak() must return target errnos. */
 static abi_long do_obreak(abi_ulong new_brk)
 {
-    abi_ulong brk_page;
     abi_long mapped_addr;
     int new_alloc_size;
 
     if (!new_brk)
         return 0;
-    if (new_brk < target_original_brk)
+    if (new_brk < target_brk_start) {
         return -TARGET_EINVAL;
-
-    brk_page = HOST_PAGE_ALIGN(target_brk);
+    }
 
     /* If the new brk is less than this, set it and we're done... */
-    if (new_brk < brk_page) {
-        target_brk = new_brk;
+    if (new_brk < target_brk_end) {
+        target_brk_cur = new_brk;
         return 0;
     }
 
     /* We need to allocate more memory after the brk... */
-    new_alloc_size = HOST_PAGE_ALIGN(new_brk - brk_page + 1);
-    mapped_addr = get_errno(target_mmap(brk_page, new_alloc_size,
+    new_alloc_size = HOST_PAGE_ALIGN(new_brk - target_brk_end + 1);
+    mapped_addr = get_errno(target_mmap(target_brk_end, new_alloc_size,
                                         PROT_READ|PROT_WRITE,
                                         MAP_ANON|MAP_FIXED|MAP_PRIVATE, -1, 0));
 
-    if (!is_error(mapped_addr))
-        target_brk = new_brk;
-    else
+    if (!is_error(mapped_addr)) {
+        target_brk_cur = new_brk;
+	target_brk_end += new_alloc_size;
+    } else {
         return mapped_addr;
+    }
 
     return 0;
 }
