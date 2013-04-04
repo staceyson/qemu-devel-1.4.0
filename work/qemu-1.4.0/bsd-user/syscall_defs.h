@@ -547,7 +547,7 @@ struct target_thr_param {
 	int32_t		flags;		/* thread flags. */
 	abi_ulong	rtp;		/* Real-time scheduling priority. */
 	abi_ulong	spare[3];	/* spares. */
-} QEMU_PACKED;
+};
 
 struct target_rtprio {
 	uint16_t	type;
