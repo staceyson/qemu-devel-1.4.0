@@ -126,7 +126,7 @@ static int pending_cpus;
 /* Make sure everything is in a consistent state for calling fork(). */
 void fork_start(void)
 {
-	pthread_mutex_lock(&tb_lock);
+	spin_lock(&tb_lock);
 	pthread_mutex_lock(&exclusive_lock);
 	mmap_fork_start();
 }
@@ -146,11 +146,11 @@ void fork_end(int child)
 		pthread_mutex_init(&cpu_list_mutex, NULL);
 		pthread_cond_init(&exclusive_cond, NULL);
 		pthread_cond_init(&exclusive_resume, NULL);
-		pthread_mutex_init(&tb_lock, NULL);
+		spin_lock_init(&tb_lock);
 		gdbserver_fork(thread_env);
 	} else {
 		pthread_mutex_unlock(&exclusive_lock);
-		pthread_mutex_unlock(&tb_lock);
+		spin_unlock(&tb_lock);
 	}
 }
 
@@ -1012,10 +1012,7 @@ void cpu_loop(CPUMIPSState *env)
 
 	for(;;) {
 		cpu_exec_start(env);
-		/* XXX there is a concurrency problem - giant lock for now */
-		pthread_mutex_lock(&exclusive_lock); /* XXX */
 		trapnr = cpu_mips_exec(env);
-		pthread_mutex_unlock(&exclusive_lock); /* XXX */
 		cpu_exec_end(env);
 		switch(trapnr) {
 		case EXCP_SYSCALL: /* syscall exception */

@@ -2591,6 +2591,8 @@ new_thread_start(void *arg)
 
 	env = info->env;
 	thread_env = env;
+	fork_end(1);
+
 	ts = (TaskState *)thread_env->opaque;
 	(void)thr_self(&tid);
 	info->tid = tid;
@@ -2697,6 +2699,7 @@ do_thr_new(CPUArchState *env, abi_ulong target_param_addr, int32_t param_size)
 	}
 
 	/* Create a new CPU instance. */
+	fork_start();
 	ts = g_malloc0(sizeof(TaskState));
 	init_task_state(ts);
 	new_env = cpu_copy(env);
@@ -2742,6 +2745,8 @@ do_thr_new(CPUArchState *env, abi_ulong target_param_addr, int32_t param_size)
 	/* XXX return value needs to be checked... */
 	ret = pthread_create(&info.thread, &attr, new_thread_start, &info);
 	/* XXX Free new CPU state if thread creation fails. */
+
+	fork_end(0);
 
 	sigprocmask(SIG_SETMASK, &info.sigmask, NULL);
 	pthread_attr_destroy(&attr);
@@ -2809,6 +2814,9 @@ do_thr_exit(CPUArchState *cpu_env, abi_ulong tid_addr)
 		g_free(ts);
 		pthread_exit(NULL);
 	}
+
+	gdb_exit(cpu_env, 0);	/* XXX need to put in the correct exit status here? */
+	_exit(0);
 }
 
 static int
@@ -4859,8 +4867,9 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
     case TARGET_FREEBSD_NR_fstat:
         {
 	    struct stat st;
+
             ret = get_errno(fstat(arg1, &st));
-	    if (! ret)
+	    if (!is_error(ret))
 		    ret = host_to_target_stat(arg2, &st);
 	}
         break;
@@ -4869,10 +4878,12 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 	 {
 		 struct timespec req, rem;
 
-		 target_to_host_timespec(&req, arg1);
-		 ret = get_errno(nanosleep(&req, &rem));
-		 if (is_error(ret) && arg2)
-			 host_to_target_timespec(arg2, &rem);
+		 ret = target_to_host_timespec(&req, arg1);
+		 if (!is_error(ret)) {
+		     ret = get_errno(nanosleep(&req, &rem));
+		     if (!is_error(ret) && arg2)
+			     host_to_target_timespec(arg2, &rem);
+		 }
 	 }
 	 break;
 

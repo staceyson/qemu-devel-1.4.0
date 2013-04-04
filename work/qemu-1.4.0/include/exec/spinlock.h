@@ -24,6 +24,7 @@
 #include <pthread.h>
 #define spin_lock pthread_mutex_lock
 #define spin_unlock pthread_mutex_unlock
+#define spin_lock_init(mtx) pthread_mutex_init(mtx, NULL)
 #define spinlock_t pthread_mutex_t
 #define SPIN_LOCK_UNLOCKED PTHREAD_MUTEX_INITIALIZER
 
