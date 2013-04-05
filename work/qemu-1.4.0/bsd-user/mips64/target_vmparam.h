@@ -23,9 +23,9 @@ struct target_ps_strings {
 
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
-/* Make stack size large enough to hold everything. */
-#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
-    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
+/* compare to sys/mips/include/vmparam.h */
+#define	TARGET_STACK_SIZE	(8UL*1024*1024)		/* initial stack size limit */
+#define	TARGET_STACK_SIZE_MAX	(64UL*1024*1024)	/* max stack size limit */
 
 #else
 

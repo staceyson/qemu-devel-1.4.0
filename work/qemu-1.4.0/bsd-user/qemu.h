@@ -232,8 +232,12 @@ extern char target_proc_pathname[];
 
 static inline int access_ok(int type, abi_ulong addr, abi_ulong size)
 {
+#if 0	// XXX temporary disable memory access checks until we can check thread stacks w/out failing
     return page_check_range((target_ulong)addr, size,
                             (type == VERIFY_READ) ? PAGE_READ : (PAGE_READ | PAGE_WRITE)) == 0;
+#else
+    return 1;
+#endif
 }
 
 /* NOTE __get_user and __put_user use host pointers and don't check access. */

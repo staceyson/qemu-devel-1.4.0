@@ -200,11 +200,13 @@ void target_set_brk(abi_ulong start_brk, abi_ulong cur_brk, abi_ulong end_brk)
 static abi_long do_obreak(abi_ulong new_brk)
 {
     abi_long mapped_addr;
-    int new_alloc_size;
+    abi_ulong new_alloc_size;
+
+    return -TARGET_EINVAL;	// XXX Temporary disable obreak() until it can be properly fixed
 
     if (!new_brk)
         return 0;
-    if (new_brk < target_brk_start) {
+    if (new_brk < target_brk_cur) {
         return -TARGET_EINVAL;
     }
 
@@ -2570,7 +2572,7 @@ do_fork(CPUArchState *env, int num, int flags, int *fdp)
 static pthread_mutex_t new_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 typedef struct {
 	CPUArchState *env;
-	long tid;
+	long parent_tid;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	pthread_t thread;
@@ -2592,18 +2594,17 @@ new_thread_start(void *arg)
 
 	ts = (TaskState *)thread_env->opaque;
 	(void)thr_self(&tid);
-	info->tid = tid;
 	task_settid(ts);
 
 	/* copy out the TID info */
 	if (info->param.child_tid)
 		put_user(tid, info->param.child_tid, abi_long);
 	if (info->param.parent_tid)
-		put_user(tid, info->param.parent_tid, abi_long);
+		put_user(info->parent_tid, info->param.parent_tid, abi_long);
 
 	/* Set arch dependent registers to start thread. */
 	thread_set_upcall(env, info->param.start_func, info->param.arg,
-	    info->param.stack_base);
+	    info->param.stack_base, info->param.stack_size);
 
 	/* Enable signals */
 	sigprocmask(SIG_SETMASK, &info->sigmask, NULL);
@@ -2682,6 +2683,8 @@ do_thr_new(CPUArchState *env, abi_ulong target_param_addr, int32_t param_size)
 	info.param.flags = tswap32(target_param->flags);
 	target_rtp_addr = info.param.rtp = tswapal(target_param->rtp);
 	unlock_user(target_param, target_param_addr, 0);
+
+	thr_self(&info.parent_tid);
 
 	if (target_rtp_addr) {
 		if (!lock_user_struct(VERIFY_READ, target_rtp, target_rtp_addr,

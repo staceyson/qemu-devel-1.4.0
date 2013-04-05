@@ -6,6 +6,10 @@
 #define	TARGET_MINSIGSTKSZ	(512 * 4)
 #define	TARGET_SIGSTKSZ		(TARGET_MINSIGSTKSZ + 32768)
 
+/* compare to sys/mips/include/asm.h */
+#define	TARGET_SZREG		8
+#define	TARGET_CALLFRAME_SIZ	(TARGET_SZREG * 4)
+
 struct target_sigcontext {
 	target_sigset_t	sc_mask;        /* signal mask to retstore */
 	int32_t		sc_onstack;     /* sigstack state to restore */
@@ -229,15 +233,24 @@ get_ucontext_sigreturn(CPUMIPSState *regs, abi_ulong uc_addr,
 /* Compare to mips/mips/vm_machdep.c cpu_set_upcall_kse() */
 static inline void
 thread_set_upcall(CPUMIPSState *regs, abi_ulong entry,
-    abi_ulong arg, abi_ulong stack_base)
+    abi_ulong arg, abi_ulong stack_base, abi_ulong stack_size)
 {
+	abi_ulong sp;
+
+	/*
+	 * At the point where a function is called, sp must be 8
+	 * byte aligned[for compatibility with 64-bit CPUs]
+	 * in ``See MIPS Run'' by D. Sweetman, p. 269
+	 * align stack
+	 */
+	sp = ((stack_base + stack_size) & ~0x7) - TARGET_CALLFRAME_SIZ;
 
 	/* t9 = pc = start function entry */
 	regs->active_tc.gpr[25] = regs->active_tc.PC = entry;
 	/* a0 = arg */
 	regs->active_tc.gpr[ 4] = arg;
-	/* sp = stack base */
-	regs->active_tc.gpr[29] = stack_base;
+	/* sp = top of the stack */
+	regs->active_tc.gpr[29] = sp;
 }
 
 #endif /* TARGET_SIGNAL_H */

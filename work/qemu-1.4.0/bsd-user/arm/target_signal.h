@@ -67,6 +67,29 @@ struct target_sigframe {
 	target_ucontext_t	sf_uc;	/* saved ucontext */
 };
 
+/* compare to sys/arm/include/frame.h */
+typedef struct target_trapframe {
+	abi_ulong tf_spsr; /* Zero on arm26 */
+	abi_ulong tf_r0;
+	abi_ulong tf_r1;
+	abi_ulong tf_r2;
+	abi_ulong tf_r3;
+	abi_ulong tf_r4;
+	abi_ulong tf_r5;
+	abi_ulong tf_r6;
+	abi_ulong tf_r7;
+	abi_ulong tf_r8;
+	abi_ulong tf_r9;
+	abi_ulong tf_r10;
+	abi_ulong tf_r11;
+	abi_ulong tf_r12;
+	abi_ulong tf_usr_sp;
+	abi_ulong tf_usr_lr;
+	abi_ulong tf_svc_sp; /* Not used on arm26 */
+	abi_ulong tf_svc_lr; /* Not used on arm26 */
+	abi_ulong tf_pc;
+} target_trapframe_t;
+
 #define	TARGET_SZSIGCODE	(8 * 4)
 
 /* Compare to arm/arm/locore.S ENTRY_NP(sigcode) */
@@ -228,11 +251,14 @@ get_ucontext_sigreturn(CPUARMState *regs, abi_ulong sf_addr,
 /* XXX crashes on first shared lib call */
 static inline void
 thread_set_upcall(CPUARMState *regs, abi_ulong entry, abi_ulong arg,
-    abi_ulong stack_base)
+    abi_ulong stack_base, abi_ulong stack_size)
 {
+	abi_ulong sp;
+
+	sp = ((stack_base + stack_size) & (8 - 1)) - sizeof(struct target_trapframe);
 
 	/* fp = sp = stack base */
-	regs->regs[11] = regs->regs[13] = stack_base;
+	regs->regs[11] = regs->regs[13] = sp;
 	/* pc = start function entry */
 	regs->regs[15] = regs->regs[14] = entry & 0xfffffffe;
 	/* r0 = arg */
