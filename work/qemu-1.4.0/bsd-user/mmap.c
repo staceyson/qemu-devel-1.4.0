@@ -348,6 +348,9 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
         case MAP_SHARED:
             printf("MAP_SHARED ");
             break;
+	case MAP_STACK:
+	    printf("MAP_STACK ");
+	    break;
         default:
             printf("[MAP_FLAGMASK=0x%x] ", flags & TARGET_BSD_MAP_FLAGMASK);
             break;
@@ -355,6 +358,14 @@ abi_long target_mmap(abi_ulong start, abi_ulong len, int prot,
         printf("fd=%d offset=" TARGET_FMT_lx "\n", fd, offset);
     }
 #endif
+
+    if (flags & MAP_STACK) {
+	    if ((fd != -1) ||
+		((prot & (PROT_READ | PROT_WRITE)) != (PROT_READ | PROT_WRITE))) {
+		    errno = EINVAL;
+		    goto fail;
+	    }
+    }
 
     if (offset & ~TARGET_PAGE_MASK) {
         errno = EINVAL;
