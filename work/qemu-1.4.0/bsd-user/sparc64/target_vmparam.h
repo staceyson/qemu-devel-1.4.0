@@ -5,6 +5,15 @@
 #define	TARGET_HW_MACHINE_ARCH  "sparc64"
 
 #if defined(__FreeBSD__)
+
+/* compare to amd64/include/vmparam.h */
+#define	TARGET_MAXTSIZ	(1*1024*1024*1024)	/* max text size */
+#define	TARGET_DFLDSIZ	(128*1024*1024)		/* initial data size limit */
+#define	TARGET_MAXDSIZ	(1*1024*1024*1024)	/* max data size */
+#define	TARGET_DFLSSIZ	(128*1024*1024)		/* initial stack size limit */
+#define	TARGET_MAXSSIZ	(1*1024*1024*1024)	/* max stack size */
+#define	TARGET_SGROWSIZ	(128*1024)		/* amount to grow stack */
+
 #define	TARGET_VM_MINUSER_ADDRESS	(0x0000000000000000UL)
 #define	TARGET_VM_MAXUSER_ADDRESS	(0x000007fe00000000UL)
 
@@ -23,10 +32,6 @@ struct target_ps_strings {
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
 #define TARGET_SZSIGCODE 0
-
-/* Make stack size large enough to hold everything. */
-#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
-    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
 
 #else
 

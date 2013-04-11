@@ -5,6 +5,15 @@
 #define	TARGET_HW_MACHINE_ARCH	"armv6"
 
 #if defined(__FreeBSD__)
+
+/* compare to arm/include/vmparam.h */
+#define	TARGET_MAXTSIZ		(64UL*1024*1024)	/* max text size */
+#define	TARGET_DFLDSIZ		(128UL*1024*1024)	/* initial data size limit */
+#define	TARGET_MAXDSIZ		(512UL*1024*1024)	/* max data size */
+#define	TARGET_DFLSSIZ		(2UL*1024*1024)		/* initial stack size limit */
+#define	TARGET_MAXSSIZ		(8UL*1024*1024)		/* max stack size */
+#define	TARGET_SGROWSIZ		(128UL*1024)		/* amount to grow stack */
+
 					/* KERNBASE - 512 MB */
 #define TARGET_VM_MAXUSER_ADDRESS	(0xc0000000 - (512 * 1024 * 1024))
 #define TARGET_USRSTACK			TARGET_VM_MAXUSER_ADDRESS
@@ -20,10 +29,6 @@ struct target_ps_strings {
 #define TARGET_ARG_MAX          262144
 
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
-
-/* Make stack size large enough to hold everything. */
-#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
-    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
 
 #else
 

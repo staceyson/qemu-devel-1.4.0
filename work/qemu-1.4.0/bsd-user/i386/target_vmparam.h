@@ -6,6 +6,14 @@
 
 #if defined(__FreeBSD__)
 
+/* compare to i386/include/vmparam.h */
+#define	TARGET_MAXTSIZ	(128UL*1024*1024)	/* max text size */
+#define	TARGET_DFLDSIZ	(128UL*1024*1024)	/* initial data size limit */
+#define	TARGET_MAXDSIZ	(512UL*1024*1024)	/* max data size */
+#define	TARGET_DFLSSIZ	(8UL*1024*1024)		/* initial stack size limit */
+#define	TARGET_MAXSSIZ	(64UL*1024*1024)	/* max stack size */
+#define	TARGET_SGROWSIZ	(128UL*1024)		/* amount to grow stack */
+
 #define	TARGET_USRSTACK	(0xbfc00000)
 
 struct target_ps_strings {
@@ -21,10 +29,6 @@ struct target_ps_strings {
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
 #define TARGET_SZSIGCODE 0
-
-/* Make stack size large enough to hold everything. */
-#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
-    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
 
 #else
 

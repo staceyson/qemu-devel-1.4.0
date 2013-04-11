@@ -5,6 +5,14 @@
 #define	TARGET_HW_MACHINE_ARCH	"sparc"
 
 #ifdef __FreeBSD__
+
+#define	TARGET_MAXTSIZ	(1*1024*1024*1024)	/* max text size */
+#define	TARGET_DFLDSIZ	(128*1024*1024)		/* initial data size limit */
+#define	TARGET_MAXDSIZ	(1*1024*1024*1024)	/* max data size */
+#define	TARGET_DFLSSIZ	(128*1024*1024)		/* initial stack size limit */
+#define	TARGET_MAXSSIZ	(1*1024*1024*1024)	/* max stack size */
+#define	TARGET_SGROWSIZ	(128*1024)		/* amount to grow stack */
+
 struct target_ps_strings {
         abi_ulong ps_argvstr;
         uint32_t ps_nargvstr;
@@ -22,10 +30,6 @@ struct target_ps_strings {
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
 #define TARGET_SZSIGCODE 0
-
-/* Make stack size large enough to hold everything. */
-#define TARGET_STACK_SIZE ((x86_stack_size < MAX_ARG_PAGES*TARGET_PAGE_SIZE) ? \
-    MAX_ARG_PAGES*TARGET_PAGE_SIZE : x86_stack_size)
 
 #else
 

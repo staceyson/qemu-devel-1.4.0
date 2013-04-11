@@ -5148,12 +5148,23 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 		struct target_rlimit *target_rlim;
 		struct rlimit rlim;
 
-		/* Return the target stack size */
-		if (RLIMIT_STACK == resource) {
-			rlim.rlim_cur = rlim.rlim_max = TARGET_STACK_SIZE;
+		switch (resource) {
+		case RLIMIT_STACK:
+			rlim.rlim_cur = target_dflssiz;
+			rlim.rlim_max = target_maxssiz;
 			ret = 0;
-		} else
+			break;
+
+		case RLIMIT_DATA:
+			rlim.rlim_cur = target_dfldsiz;
+			rlim.rlim_max = target_maxdsiz;
+			ret = 0;
+			break;
+
+		default:
 			ret = get_errno(getrlimit(resource, &rlim));
+			break;
+		}
 		if (!is_error(ret)) {
 			if (!lock_user_struct(VERIFY_WRITE, target_rlim, arg2,
 				0))

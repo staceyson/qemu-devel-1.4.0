@@ -6,6 +6,14 @@
 
 #if defined(__FreeBSD__)
 
+/* compare to sys/mips/include/vmparam.h */
+#define	TARGET_MAXTSIZ		(128UL*1024*1024)	/* max text size */
+#define	TARGET_DFLDSIZ		(128UL*1024*1024)	/* initial data size limit */
+#define	TARGET_MAXDSIZ		(1*1024UL*1024*1024)	/* max data size */
+#define	TARGET_DFLSSIZ		(8UL*1024*1024)		/* initial stack size limit */
+#define	TARGET_MAXSSIZ		(64UL*1024*1024)	/* max stack size */
+#define	TARGET_SGROWSIZ		(128UL*1024)		/* amount to grow stack */
+
 #define	TARGET_VM_MINUSER_ADDRESS	(0x0000000000000000UL)
 #define	TARGET_VM_MAXUSER_ADDRESS	(0x0000008000000000UL)
 
@@ -22,10 +30,6 @@ struct target_ps_strings {
 #define TARGET_ARG_MAX		262144
 
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
-
-/* compare to sys/mips/include/vmparam.h */
-#define	TARGET_STACK_SIZE	(8UL*1024*1024)		/* initial stack size limit */
-#define	TARGET_STACK_SIZE_MAX	(64UL*1024*1024)	/* max stack size limit */
 
 #else
 

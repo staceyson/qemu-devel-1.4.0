@@ -56,10 +56,15 @@ const char *qemu_uname_release = CONFIG_UNAME_RELEASE;
 extern char **environ;
 enum BSDType bsd_type;
 
+unsigned long target_maxtsiz = TARGET_MAXTSIZ;	/* max text size */
+unsigned long target_dfldsiz = TARGET_DFLDSIZ;	/* initial data size limit */
+unsigned long target_maxdsiz = TARGET_MAXDSIZ;	/* max data size */
 /* XXX: on x86 MAP_GROWSDOWN only works if ESP <= address + 32, so
    we allocate a bigger stack. Need a better solution, for example
    by remapping the process stack directly at the right place */
-unsigned long x86_stack_size = 512 * 1024;
+unsigned long target_dflssiz = TARGET_DFLSSIZ;	/* initial data size limit */
+unsigned long target_maxssiz = TARGET_MAXSSIZ;	/* max stack size */
+unsigned long target_sgrowsiz = TARGET_SGROWSIZ;/* amount to grow stack */
 
 static void save_proc_pathname(void);
 char qemu_proc_pathname[PATH_MAX];
@@ -1478,7 +1483,7 @@ static void usage(void)
            ,
            TARGET_ARCH,
            interp_prefix,
-           x86_stack_size,
+           target_dflssiz,
            DEBUG_LOGFILE);
     exit(1);
 }
@@ -1600,13 +1605,15 @@ int main(int argc, char **argv)
                 usage();
         } else if (!strcmp(r, "s")) {
             r = argv[optind++];
-            x86_stack_size = strtol(r, (char **)&r, 0);
-            if (x86_stack_size <= 0)
+            target_dflssiz = strtol(r, (char **)&r, 0);
+            if (target_dflssiz <= 0)
                 usage();
             if (*r == 'M')
-                x86_stack_size *= 1024 * 1024;
+                target_dflssiz *= 1024 * 1024;
             else if (*r == 'k' || *r == 'K')
-                x86_stack_size *= 1024;
+                target_dflssiz *= 1024;
+	    if (target_dflssiz > target_maxssiz)
+		    usage();
         } else if (!strcmp(r, "L")) {
             interp_prefix = argv[optind++];
         } else if (!strcmp(r, "p")) {

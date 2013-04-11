@@ -221,7 +221,12 @@ void mmap_fork_end(int child);
 #endif
 
 /* main.c */
-extern unsigned long x86_stack_size;
+extern unsigned long target_maxtsiz;
+extern unsigned long target_dfldsiz;
+extern unsigned long target_maxdsiz;
+extern unsigned long target_dflssiz;
+extern unsigned long target_maxssiz;
+extern unsigned long target_sgrowsiz;
 extern char qemu_proc_pathname[];
 extern char target_proc_pathname[];
 
@@ -232,12 +237,8 @@ extern char target_proc_pathname[];
 
 static inline int access_ok(int type, abi_ulong addr, abi_ulong size)
 {
-#if 0	// XXX temporary disable memory access checks until we can check thread stacks w/out failing
     return page_check_range((target_ulong)addr, size,
                             (type == VERIFY_READ) ? PAGE_READ : (PAGE_READ | PAGE_WRITE)) == 0;
-#else
-    return 1;
-#endif
 }
 
 /* NOTE __get_user and __put_user use host pointers and don't check access. */
