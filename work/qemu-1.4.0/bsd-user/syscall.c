@@ -7300,11 +7300,28 @@ abi_long do_freebsd_syscall(void *cpu_env, int num, abi_long arg1,
 
 #if defined(__FreeBSD_version) && __FreeBSD_version > 900000
 		 case TARGET_UMTX_OP_NWAKE_PRIVATE:
-			if (! access_ok(VERIFY_READ, obj,
-				val * sizeof(uint32_t)))
-				goto efault;
-			ret = get_errno(_umtx_op(g2h(obj), UMTX_OP_NWAKE_PRIVATE,
-				val, NULL, NULL));
+			{
+				int i;
+				abi_ulong *uaddr;
+
+				if (! access_ok(VERIFY_READ, obj,
+					val * sizeof(uint32_t)))
+					goto efault;
+
+				ret = get_errno(_umtx_op(g2h(obj), UMTX_OP_NWAKE_PRIVATE,
+					val, NULL, NULL));
+
+				uaddr = (abi_ulong *)g2h(obj);
+				ret = 0;
+				for(i = 0; i < (int32_t)val; i++) {
+					ret = get_errno(_umtx_op(g2h(tswapal(uaddr[i])),
+						UMTX_OP_WAKE_PRIVATE, tswap32(INT_MAX),
+						NULL, NULL));
+					if (ret)
+						break;
+				}
+
+			}
 			break;
 #endif
 
