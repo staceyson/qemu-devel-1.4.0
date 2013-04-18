@@ -3036,7 +3036,7 @@ do_lock_umutex(abi_ulong target_addr, uint32_t id, struct timespec *ts,
     int mode)
 {
 	uint32_t owner, flags;
-	int ret;
+	int ret = 0;
 
 	for (;;) {
 		struct target_umutex *target_umutex;
@@ -3084,7 +3084,6 @@ do_lock_umutex(abi_ulong target_addr, uint32_t id, struct timespec *ts,
 		}
 
 		__get_user(flags, &target_umutex->m_flags);
-		flags = tswap32(flags);
 		if ((flags & TARGET_UMUTEX_ERROR_CHECK) != 0 &&
 		    (owner & ~TARGET_UMUTEX_CONTESTED) == id) {
 			unlock_user_struct(target_umutex, target_addr, 1);
@@ -3094,6 +3093,15 @@ do_lock_umutex(abi_ulong target_addr, uint32_t id, struct timespec *ts,
 		if (TARGET_UMUTEX_TRY == mode) {
 			unlock_user_struct(target_umutex, target_addr, 1);
 			return (-TARGET_EBUSY);
+		}
+
+		/*
+		 * If we caught a signal, we have retried and now
+		 * exit immediately.
+		 */
+		if (ret) {
+			unlock_user_struct(target_umutex, target_addr, 1);
+			return (ret);
 		}
 
 		/* Set the contested bit and sleep. */
@@ -3110,8 +3118,6 @@ do_lock_umutex(abi_ulong target_addr, uint32_t id, struct timespec *ts,
 		owner = tswap32(owner);
 		ret = get_errno(_umtx_op(target_umutex, UMTX_OP_WAIT_UINT, owner,
 			0, ts));
-		if (ret)
-			return (ret);
 	}
 
 	return (0);
