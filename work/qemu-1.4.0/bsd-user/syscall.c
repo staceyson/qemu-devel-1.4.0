@@ -3120,6 +3120,15 @@ do_lock_umutex(abi_ulong target_addr, uint32_t id, struct timespec *ts,
 			0, ts));
 	}
 
+	if (NULL == ts) {
+		/*
+		 * In the case of no timeout do a restart on this syscall,
+		 * if interrupted.
+		 */
+		if (-TARGET_EINTR == ret)
+			ret = -TARGET_ERESTART;
+	}
+
 	return (0);
 }
 

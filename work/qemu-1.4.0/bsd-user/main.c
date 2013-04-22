@@ -1022,7 +1022,7 @@ void cpu_loop(CPUMIPSState *env)
 		switch(trapnr) {
 		case EXCP_SYSCALL: /* syscall exception */
 			syscall_num = env->active_tc.gpr[2]; /* v0 */
-			env->active_tc.PC += 4;
+			env->active_tc.PC += TARGET_INSN_SIZE;
 			if (syscall_num >= SYS_MAXSYSCALL) {
 				ret = -TARGET_ENOSYS;
 			} else {
@@ -1094,7 +1094,11 @@ void cpu_loop(CPUMIPSState *env)
 				 */
 				break;
 			}
-			/* XXX need to handle ERESTART */
+			if (-TARGET_ERESTART == ret) {
+				/* Backup the pc to point at the swi. */
+				env->active_tc.PC -= TARGET_INSN_SIZE;
+				break;
+			}
 			if ((unsigned int)ret >= (unsigned int)(-1133)) {
 				env->active_tc.gpr[7] = 1;
 				ret = -ret;

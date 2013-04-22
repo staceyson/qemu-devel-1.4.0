@@ -124,6 +124,10 @@ host_to_target_signal(int sig)
 
 	if (sig >= _NSIG)
 		return (sig);
+	if (sig < 0) {
+		printf("host_to_target_signal: sig = %d\n", sig);
+		return (0);
+	}
 	return (host_to_target_signal_table[sig]);
 }
 
@@ -598,11 +602,13 @@ do_sigaction(int sig, const struct target_sigaction *act,
 			 if (k->_sa_handler == TARGET_SIG_IGN) {
 				 act1.sa_sigaction = (void *)SIG_IGN;
 			 } else if (k->_sa_handler == TARGET_SIG_DFL) {
-				  if (fatal_signal(sig))
+				  if (fatal_signal(sig)) {
+					  act1.sa_flags = SA_SIGINFO;
 					  act1.sa_sigaction =
 					      host_signal_handler;
-				  else
+				  } else {
 					  act1.sa_sigaction = (void *)SIG_DFL;
+				  }
 			 } else {
 				act1.sa_flags = SA_SIGINFO;
 				act1.sa_sigaction = host_signal_handler;

@@ -31,6 +31,8 @@ struct target_ps_strings {
 
 #define TARGET_PS_STRINGS  (TARGET_USRSTACK - sizeof(struct target_ps_strings))
 
+#define	TARGET_INSN_SIZE 4
+
 #else
 
 #define	TARGET_USRSTACK	 0

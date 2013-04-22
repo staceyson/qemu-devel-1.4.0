@@ -33,6 +33,8 @@ struct target_ps_strings {
 
 #define TARGET_SZSIGCODE 0
 
+#define	TARGET_INSN_SIZE 4
+
 #else
 
 #define	TARGET_USRSTACK 0
