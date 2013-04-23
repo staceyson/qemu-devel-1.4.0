@@ -122,12 +122,9 @@ int
 host_to_target_signal(int sig)
 {
 
-	if (sig >= _NSIG)
+	if (sig < 0 || sig >= _NSIG)
 		return (sig);
-	if (sig < 0) {
-		printf("host_to_target_signal: sig = %d\n", sig);
-		return (0);
-	}
+
 	return (host_to_target_signal_table[sig]);
 }
 
