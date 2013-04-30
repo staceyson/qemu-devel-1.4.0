@@ -154,19 +154,77 @@ abi_ulong loader_build_argptr(int envc, int argc, abi_ulong sp,
     return sp;
 }
 
+static int
+is_there(const char *candidate)
+{
+	struct stat fin;
+
+	/* XXX work around access(2) false positives for superuser */
+	if (access(candidate, X_OK) == 0 &&
+	    stat(candidate, &fin) == 0 &&
+	    S_ISREG(fin.st_mode) &&
+	    (getuid() != 0 ||
+	     (fin.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0)) {
+		return (1);
+	}
+	return (0);
+}
+
+static int
+find_in_path(char *path, const char *filename, char *retpath, size_t rpsize)
+{
+	const char *d;
+	int found;
+
+	if (strchr(filename, '/') != NULL)
+	    return (is_there(filename) ? 0 : -1);
+	found = 0;
+	while ((d = strsep(&path, ":")) != NULL) {
+		if (*d == '\0')
+			d = ".";
+		if (snprintf(retpath, rpsize, "%s/%s", d,
+		    filename) >= (int)rpsize)
+			continue;
+		if (is_there((const char *)retpath)) {
+			found = 1;
+			break;
+		}
+	}
+	return (found);
+}
+
 int loader_exec(const char * filename, char ** argv, char ** envp,
              struct target_pt_regs * regs, struct image_info *infop,
 	     struct bsd_binprm *bprm)
 {
     int retval;
     int i;
+    char *p, *path, fullpath[PATH_MAX];
+    ssize_t pathlen;
 
     bprm->p = TARGET_PAGE_SIZE*MAX_ARG_PAGES /*-sizeof(unsigned int) XXX */;
     for (i=0 ; i<MAX_ARG_PAGES ; i++)       /* clear page-table */
             bprm->page[i] = NULL;
-    retval = open(filename, O_RDONLY);
+
+    /* Find target executable in path, if not already fullpath. */
+    if ((p = getenv("PATH")) != NULL) {
+	    pathlen = strlen(p) + 1;
+	    path = malloc(pathlen);
+	    if (NULL == path) {
+		    fprintf(stderr, "Out of memory\n");
+		    return (-1);
+	    }
+	    memcpy(path, p, pathlen);
+	    if (find_in_path(path, filename, fullpath, sizeof(fullpath)))
+		retval = open(fullpath, O_RDONLY);
+	    else
+		retval = open(filename, O_RDONLY);
+
+    } else
+	    retval = open(filename, O_RDONLY);
     if (retval < 0)
         return retval;
+
     bprm->fd = retval;
     bprm->filename = (char *)filename;
     bprm->argc = count(argv);
